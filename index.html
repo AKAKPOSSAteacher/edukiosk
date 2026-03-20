@@ -177,12 +177,24 @@ function cloudGet(onDone){
         if(cloudHasDocs){SS(K.d,data.docs);}
         else if(localDocs.length>0){cloudPost('saveDocs',localDocs);}
         if(data.results&&data.results.length>0){
-          // Nettoyer les noms de classe qui auraient été convertis en notation scientifique
+          // Nettoyer les classes converties par Sheets en notation scientifique
+          // Ex: "3e8" → 300000000, "4e2" → 400, "4,00E+02" → "4e2"
           data.results=data.results.map(function(r){
             if(r.classe){
-              // Détecter notation scientifique ex: "4E+2" ou "4,00E+02" → "4e2"
-              var m=r.classe.toString().match(/^(\d+)[,.]?0*[Ee]\+?0*(\d+)$/);
-              if(m)r.classe=m[1]+'e'+m[2];
+              var c=r.classe.toString().trim();
+              // Supprimer éventuel préfixe zero-width space
+              c=c.replace(/^\u200b/,'');
+              // Détecter notation scientifique textuelle ex: "4E+2", "4,00E+02"
+              var m1=c.match(/^(\d+)[,.]?0*[Ee]\+?0*(\d+)$/);
+              if(m1){r.classe=m1[1]+'e'+m1[2];return r;}
+              // Détecter grands nombres qui étaient des classes (ex: 300000000 = 3e8, 400 = 4e2)
+              // Chercher dans les données locales si une classe correspond
+              var localR=SL(K.r,[]);
+              var known=localR.find(function(lr){
+                return lr.studentName===r.studentName&&lr.date===r.date&&lr.classe&&lr.classe!==c;
+              });
+              if(known)r.classe=known.classe;
+              else r.classe=c;
             }
             return r;
           });
