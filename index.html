@@ -177,25 +177,8 @@ function cloudGet(onDone){
         if(cloudHasDocs){SS(K.d,data.docs);}
         else if(localDocs.length>0){cloudPost('saveDocs',localDocs);}
         if(data.results&&data.results.length>0){
-          // Nettoyer les classes converties par Sheets en notation scientifique
-          // Ex: "3e8" → 300000000, "4e2" → 400, "4,00E+02" → "4e2"
           data.results=data.results.map(function(r){
-            if(r.classe){
-              var c=r.classe.toString().trim();
-              // Supprimer éventuel préfixe zero-width space
-              c=c.replace(/^\u200b/,'');
-              // Détecter notation scientifique textuelle ex: "4E+2", "4,00E+02"
-              var m1=c.match(/^(\d+)[,.]?0*[Ee]\+?0*(\d+)$/);
-              if(m1){r.classe=m1[1]+'e'+m1[2];return r;}
-              // Détecter grands nombres qui étaient des classes (ex: 300000000 = 3e8, 400 = 4e2)
-              // Chercher dans les données locales si une classe correspond
-              var localR=SL(K.r,[]);
-              var known=localR.find(function(lr){
-                return lr.studentName===r.studentName&&lr.date===r.date&&lr.classe&&lr.classe!==c;
-              });
-              if(known)r.classe=known.classe;
-              else r.classe=c;
-            }
+            if(r.classe)r.classe=r.classe.toString().replace(/^_/,'').trim();
             return r;
           });
           SS(K.r,data.results);
@@ -236,8 +219,13 @@ function cloudGet(onDone){
 
 function cloudPost(action,data,onDone){
   if(!API_URL)return onDone&&onDone(null);
-  // Pour le POST, on utilise fetch en mode no-cors (fire-and-forget)
-  // On ne peut pas lire la réponse mais les données sont bien envoyées
+  // Préfixer les classes avec _ avant envoi pour éviter conversion scientifique dans Sheets
+  if(action==='saveResult'&&data&&data.classe){
+    data=Object.assign({},data,{classe:'_'+data.classe.replace(/^_/,'')});
+  }
+  if(action==='saveResults'&&Array.isArray(data)){
+    data=data.map(function(r){return r.classe?Object.assign({},r,{classe:'_'+r.classe.replace(/^_/,'')}):r;});
+  }
   fetch(API_URL,{
     method:'POST',
     mode:'no-cors',
