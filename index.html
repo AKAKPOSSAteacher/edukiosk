@@ -490,6 +490,7 @@ function runKiosk(payload,type,student){
         pct:null,score:null,max:null
       };
       var all=[].concat(SL(K.r,[]));all.push(result);SS(K.r,all);
+      cloudPost('saveResult',result);
       stopAC();
       showLogin();
     };
