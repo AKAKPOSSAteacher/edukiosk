@@ -143,7 +143,7 @@ td{padding:9px 12px;border-bottom:1px solid var(--bd);}tr:last-child td{border-b
 <script>
 'use strict';
 /* STORAGE LOCAL */
-var K={t:'ek_t',d:'ek_d',r:'ek_r',p:'ek_p',s:'ek_s'};
+var K={t:'ek_t',d:'ek_d',r:'ek_r',p:'ek_p',s:'ek_s',k:'ek_kiosk'};
 function SS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function SL(k,d){try{var r=localStorage.getItem(k);return r===null?d:JSON.parse(r);}catch(e){return d;}}
 
@@ -672,6 +672,9 @@ function showIdForm(payload,type,onStart){
 
 /* KIOSK RUNNER */
 function runKiosk(payload,type,student){
+  // Sauvegarder l'état kiosk — restauré si l'app se ferme sur iOS
+  SS(K.k,{payload:payload,type:type,student:student,infractions:0,t0:Date.now()});
+
   render('<div style="min-height:100vh;background:var(--cr);display:flex;flex-direction:column"><div id="ac"></div><div id="ssov" style="display:none;flex-direction:column"><div style="font-size:2.5rem">&#128247;</div><div style="font-size:1.4rem;font-weight:800;color:#ff6b6b">CAPTURE DETECTEE</div><div style="opacity:.65;font-size:.9rem">Infraction enregistree.</div></div><div id="lock" style="display:none;flex-direction:column"><div class="l-icon">&#128274;</div><div class="l-title">SESSION VERROUILLEE</div><div class="l-sub">Tentative de navigation detectee.</div><div class="infr" id="l-infr"></div><div class="l-form"><input class="l-inp" type="password" id="l-pin" maxlength="30" placeholder="Code PIN professeur" autocomplete="new-password"><div id="l-err" style="color:#ff8080;font-size:.8rem;display:none">Code incorrect</div><button class="btn bg bfull" id="l-ok">Deverrouiller</button><button class="btn bfull" style="background:transparent;border:none;color:rgba(255,255,255,.3);font-size:.76rem" id="l-abort">Abandonner</button></div></div><div id="deov" style="display:none"></div><div id="kbody" style="flex:1;padding:1.5rem;overflow-y:auto"></div></div>');
 
   function updAC(){var ac=document.getElementById('ac');if(ac)ac.innerHTML='<div id="acbar" class="ac" style="width:100%"><span><span class="acd" style="background:#ff6b6b"></span>'+(type==='doc'?'Consultation verrouillee':'Mode examen actif')+'</span><span><span class="acd" style="background:'+(_infractions===0?'#27ae60':'#ff6b6b')+'"></span>'+_infractions+' infraction(s)</span><span style="margin-left:auto;opacity:.4">ESC/Home bloques</span></div>';}
@@ -706,7 +709,7 @@ function runKiosk(payload,type,student){
       };
       var all=[].concat(SL(K.r,[]));all.push(result);SS(K.r,all);
       cloudPost('saveResult',result);
-      // Attendre 800ms que le fetch parte avant de quitter
+      SS(K.k,null); // effacer l'état kiosk
       setTimeout(function(){stopAC();showLogin();},800);
     };
     var lp=document.getElementById('l-pin');if(lp)lp.onkeydown=function(e){if(e.key==='Enter')tryPin();e.stopPropagation();};
@@ -720,6 +723,7 @@ function runKiosk(payload,type,student){
 
   function finish(result){
     stopAC();
+    SS(K.k,null); // effacer l'état kiosk
     if(result){
       var all=[].concat(SL(K.r,[]));all.push(result);SS(K.r,all);
       cloudPost('saveResult',result);
@@ -1665,6 +1669,24 @@ function showStudentHome(user){
     banner.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#0f2044;color:#fff;padding:14px 16px;z-index:99999;display:flex;align-items:center;gap:12px;font-size:.85rem;box-shadow:0 -4px 20px rgba(0,0,0,.3);';
     banner.innerHTML='<span style="font-size:1.6rem">📲</span><div style="flex:1"><div style="font-weight:700;margin-bottom:2px">Mode examen — Installation requise</div><div style="opacity:.8;font-size:.78rem">Appuyez sur <strong>&#9633; Partager</strong> → <strong>Sur l\'écran d\'accueil</strong> pour bloquer les onglets</div></div><button onclick="this.parentNode.remove()" style="background:rgba(255,255,255,.15);border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.78rem;flex-shrink:0">✕ Plus tard</button>';
     document.body.appendChild(banner);
+  }
+
+  // Restaurer session kiosk si l'app a été fermée pendant un examen
+  var ks=SL(K.k,null);
+  if(ks&&ks.payload&&ks.student){
+    // Session interrompue — remettre le verrou immédiatement
+    _infractions=(ks.infractions||0)+1; // compter la fermeture comme infraction
+    runKiosk(ks.payload,ks.type,ks.student);
+    // Afficher le verrou directement
+    setTimeout(function(){
+      var lk=document.getElementById('lock');
+      if(lk){
+        lk.style.display='flex';
+        var li=document.getElementById('l-infr');
+        if(li)li.textContent='⚠ Application fermee — '+_infractions+' infraction(s)';
+      }
+    },300);
+    return;
   }
 
   var p=urlPayload();
