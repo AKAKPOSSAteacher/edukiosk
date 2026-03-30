@@ -1495,8 +1495,14 @@ function showTeacher(){
       // Carte sync cloud
       +'<div class="card" style="border-color:'+(apiOk?'#a9dfbf':'var(--bd)')+';">'
         +'<div class="ct mb1">&#9729; Synchronisation Google Sheets</div>'
-        +'<div style="font-size:.84rem;color:var(--mt);margin-bottom:1rem">Vos donnees sont synchronisees avec Google Sheets. Utilisez ces boutons si un appareil ne montre pas les bonnes donnees.</div>'
-        +'<div id="cloud-msg" class="minfo" style="margin-bottom:1rem;'+(apiOk?'':'display:none')+'">&#128279; Connecte a Google Sheets</div>'
+        +'<div style="font-size:.84rem;color:var(--mt);margin-bottom:1rem">Vos donnees sont synchronisees avec Google Sheets.</div>'
+        +'<label>URL du Apps Script</label>'
+        +'<input type="text" id="api-url-inp" value="'+(API_URL||'')+'" placeholder="https://script.google.com/macros/s/.../exec" style="font-size:.78rem">'
+        +'<div style="display:flex;gap:8px;margin-top:-.5rem;margin-bottom:1rem">'
+          +'<button class="btn bn bsm" id="save-api-url">Enregistrer URL</button>'
+          +'<button class="btn bo bsm" id="test-api-url">Tester</button>'
+        +'</div>'
+        +'<div id="api-url-status" style="font-size:.8rem;margin-bottom:.75rem;display:none"></div>'
         +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
           +'<button class="btn bn" id="cloud-push">&#8679; Envoyer local → Sheets</button>'
           +'<button class="btn bg" id="cloud-pull">&#8681; Recevoir Sheets → local</button>'
@@ -1516,7 +1522,42 @@ function showTeacher(){
       +'<div class="card" style="background:#fffbe6;border:1px solid #f5c842"><div class="ct mb1" style="color:#7a5c00">Code de secours : ****</div><p style="font-size:.84rem;color:#7a5c00">Tapez **** dans n\'importe quel champ PIN pour deverrouiller en urgence.</p></div>'
       +'<div class="card"><div class="ct mb1">&#128203; Workflow XML Moodle</div><div class="gs"><div class="gn">1</div><div><div style="font-weight:600;font-size:.88rem">Generez avec Claude</div><div style="font-size:.8rem;color:var(--mt)">Demandez : "Genere un quiz Moodle XML sur [sujet]"</div></div></div><div class="gs"><div class="gn">2</div><div><div style="font-weight:600;font-size:.88rem">Telechargez le .xml</div></div></div><div class="gs" style="border-bottom:none"><div class="gn">3</div><div><div style="font-weight:600;font-size:.88rem">Importez dans EduKiosk</div><div style="font-size:.8rem;color:var(--mt)">Tests &#8594; Nouveau &#8594; Importer XML</div></div></div></div>';
 
-    // Bouton PUSH : local → Sheets
+    // Sauvegarder et tester l'URL API
+    var saveUrl=document.getElementById('save-api-url');
+    if(saveUrl)saveUrl.onclick=function(){
+      var newUrl=v('#api-url-inp').trim();
+      if(!newUrl||!newUrl.startsWith('https://')){
+        var st=document.getElementById('api-url-status');
+        if(st){st.className='merr';st.textContent='URL invalide.';st.style.display='';}
+        return;
+      }
+      SS('ek_api',newUrl);API_URL=newUrl;
+      var st=document.getElementById('api-url-status');
+      if(st){st.className='mok';st.textContent='URL enregistree !';st.style.display='';}
+      showToast('URL API mise a jour !');
+    };
+    var testUrl=document.getElementById('test-api-url');
+    if(testUrl)testUrl.onclick=function(){
+      var url=v('#api-url-inp').trim();
+      if(!url){return;}
+      var st=document.getElementById('api-url-status');
+      if(st){st.className='minfo';st.textContent='Test en cours...';st.style.display='';}
+      var cbName='_ek_ping_'+Date.now();
+      window[cbName]=function(data){
+        delete window[cbName];
+        if(s&&s.parentNode)s.parentNode.removeChild(s);
+        if(st){
+          if(data&&data.ok&&data.version==='v9'){st.className='mok';st.textContent='✓ v9 active — connexion OK !';}
+          else if(data&&data.ok){st.className='mwarn';st.textContent='⚠ Connecte mais version '+( data.version||'?')+' — mettez a jour le script.';}
+          else{st.className='merr';st.textContent='Erreur: '+(data&&data.error?data.error:'inconnue');}
+          st.style.display='';
+        }
+      };
+      var s=document.createElement('script');
+      s.onerror=function(){if(st){st.className='merr';st.textContent='Connexion impossible.';st.style.display='';}};
+      s.src=url+'?action=ping&callback='+cbName+'&t='+Date.now();
+      document.head.appendChild(s);
+    };
     var cpush=document.getElementById('cloud-push');
     if(cpush)cpush.onclick=function(){
       var st=document.getElementById('cloud-status');
