@@ -523,49 +523,51 @@ function showLogin(){
       return;
     }
 
-    // Sinon chercher dans le cloud via JSONP (contourne CORS)
+    // Chercher dans le cloud via fetch
     if(!API_URL){
       btn.disabled=false;if(loading)loading.style.display='none';
       err.className='merr';err.textContent='Code introuvable. Verifiez le code ou la connexion.';err.style.display='';
       return;
     }
 
-    var cbName='_ek_code_'+Date.now();
-    var done=false;
-    var s=document.createElement('script');
+    // Essayer fetch normal puis JSONP
+    function tryFetch(){
+      fetch(API_URL+'?action=getByCode&code='+encodeURIComponent(code)+'&t='+Date.now())
+        .then(function(r){return r.json();})
+        .then(handleData)
+        .catch(function(){tryJsonp();});
+    }
 
-    window[cbName]=function(data){
-      done=true;
-      delete window[cbName];
-      if(s&&s.parentNode)s.parentNode.removeChild(s);
+    function tryJsonp(){
+      var cbName='_ekc'+Date.now();
+      var done=false;
+      var sc=document.createElement('script');
+      window[cbName]=function(data){done=true;delete window[cbName];if(sc.parentNode)sc.parentNode.removeChild(sc);handleData(data);};
+      sc.onerror=function(){done=true;delete window[cbName];showErr('Connexion impossible. Verifiez votre reseau.');};
+      setTimeout(function(){if(!done){done=true;delete window[cbName];if(sc.parentNode)sc.parentNode.removeChild(sc);showErr('Delai depasse. Reessayez.');}},10000);
+      // Utiliser l'URL sans callback — Apps Script retourne JSON directement
+      sc.src=API_URL+'?action=getByCode&code='+encodeURIComponent(code)+'&callback='+cbName+'&t='+Date.now();
+      document.head.appendChild(sc);
+    }
+
+    function handleData(data){
       btn.disabled=false;if(loading)loading.style.display='none';
       if(data&&data.ok&&data.session&&data.session.active){
         var sessions=SL(K.s,{});sessions[code]=data.session;SS(K.s,sessions);
         runKiosk(data.session.data,data.session.type,{name:name,classe:cl});
+      }else if(data&&data.session&&!data.session.active){
+        showErr('Cette session est terminee.');
       }else{
-        err.className='merr';
-        err.textContent=(data&&data.session&&!data.session.active)?'Cette session est terminee.':'Code introuvable. Verifiez aupres de votre professeur.';
-        err.style.display='';
+        showErr('Code introuvable. Verifiez le code aupres de votre professeur.');
       }
-    };
+    }
 
-    s.onerror=function(){
-      if(done)return;
-      done=true;delete window[cbName];
+    function showErr(msg){
       btn.disabled=false;if(loading)loading.style.display='none';
-      err.className='merr';err.textContent='Connexion impossible. Verifiez le code et reessayez.';err.style.display='';
-    };
+      err.className='merr';err.textContent=msg;err.style.display='';
+    }
 
-    setTimeout(function(){
-      if(done)return;
-      done=true;delete window[cbName];
-      if(s&&s.parentNode)s.parentNode.removeChild(s);
-      btn.disabled=false;if(loading)loading.style.display='none';
-      err.className='merr';err.textContent='Delai depasse. Verifiez votre connexion.';err.style.display='';
-    },12000);
-
-    s.src=API_URL+'?action=getByCode&code='+encodeURIComponent(code)+'&callback='+cbName+'&t='+Date.now();
-    document.head.appendChild(s);
+    tryFetch();
   }
 
   g('#btn-ok').onclick=goStudent;
@@ -928,6 +930,17 @@ function showTeacher(){
   function svT(){SS(K.t,tests);cloudPost('saveTests',tests);}
   function svD(){SS(K.d,docs);cloudPost('saveDocs',docs);}
 
+  // Nettoyer les sessions expirées au démarrage (plus de 12h)
+  var sessions=SL(K.s,{});
+  var now=Date.now();
+  var cleaned={};
+  Object.keys(sessions).forEach(function(k){
+    var s=sessions[k];
+    // Garder uniquement les sessions actives de moins de 12h
+    if(s.active&&(now-s.created)<12*60*60*1000)cleaned[k]=s;
+  });
+  SS(K.s,cleaned);
+
   // Stocker l'URL API si pas encore fait
   if(!SL('ek_api',''))SS('ek_api','https://script.google.com/macros/s/AKfycbz4B50SLCYIpOipCwJL53_JCdTpgSvNqv62hOYG9eZY3doPrrPBOxon3nL5bk6k7YzK/exec');
   API_URL=SL('ek_api','');
@@ -985,7 +998,7 @@ function showTeacher(){
     if(activeSess.length){
       var sDiv=document.createElement('div');
       sDiv.style.cssText='background:linear-gradient(135deg,#0f2044,#1a3260);border-radius:var(--r);padding:1.25rem;margin-bottom:.9rem;color:#fff;';
-      var sHtml='<div style="font-weight:700;font-size:.97rem;margin-bottom:1rem">&#9654; Sessions actives ('+activeSess.length+')</div><div style="display:flex;gap:10px;flex-wrap:wrap">';
+      var sHtml='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem"><div style="font-weight:700;font-size:.97rem">&#9654; Sessions actives ('+activeSess.length+')</div><button id="stop-all" style="background:rgba(255,80,80,.25);border:1px solid rgba(255,80,80,.4);color:#ffaaaa;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:.78rem;">&#9632; Tout arreter</button></div><div style="display:flex;gap:10px;flex-wrap:wrap">';
       activeSess.forEach(function(s){
         sHtml+='<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:.75rem 1rem;min-width:180px">'
           +'<div style="font-size:.72rem;opacity:.6;text-transform:uppercase;letter-spacing:1px">'+(s.type==='exam'?'Test':'Document')+'</div>'
@@ -1000,6 +1013,11 @@ function showTeacher(){
       sDiv.querySelectorAll('[data-stop]').forEach(function(btn){
         btn.onclick=function(){deactivateSession(btn.dataset.stop);mn.innerHTML='';bHome(mn);showToast('Session arretee.');};
       });
+      var stopAll=sDiv.querySelector('#stop-all');
+      if(stopAll)stopAll.onclick=function(){
+        activeSess.forEach(function(s){deactivateSession(s.code);});
+        mn.innerHTML='';bHome(mn);showToast('Toutes les sessions arretees.');
+      };
       mn.appendChild(sDiv);
     }
 
