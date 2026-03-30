@@ -143,9 +143,37 @@ td{padding:9px 12px;border-bottom:1px solid var(--bd);}tr:last-child td{border-b
 <script>
 'use strict';
 /* STORAGE LOCAL */
-var K={t:'ek_t',d:'ek_d',r:'ek_r',p:'ek_p'};
+var K={t:'ek_t',d:'ek_d',r:'ek_r',p:'ek_p',s:'ek_s'};
 function SS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function SL(k,d){try{var r=localStorage.getItem(k);return r===null?d:JSON.parse(r);}catch(e){return d;}}
+
+/* ── SESSIONS ── */
+function genCode(){return String(100000+Math.floor(Math.random()*900000));}
+
+function saveSession(sess){
+  var sessions=SL(K.s,{});
+  sessions[sess.code]=sess;
+  SS(K.s,sessions);
+  // Sync vers cloud
+  cloudPost('saveSession',sess);
+}
+
+function getSession(code){
+  var sessions=SL(K.s,{});
+  return sessions[code]||null;
+}
+
+function deactivateSession(code){
+  var sessions=SL(K.s,{});
+  if(sessions[code])sessions[code].active=false;
+  SS(K.s,sessions);
+  cloudPost('deactivateSession',{code:code});
+}
+
+function getActiveSessions(){
+  var sessions=SL(K.s,{});
+  return Object.values(sessions).filter(function(s){return s.active;});
+}
 
 /* ─── CLOUD SYNC (Google Sheets) ─── */
 var API_URL=SL('ek_api','');
@@ -445,17 +473,110 @@ function v(sel){var el=g(sel);return el?el.value:'';}
 
 /* LOGIN */
 function showLogin(){
-  var role='student';
-  render('<div class="lbg"><div class="lcard"><div class="tc" style="margin-bottom:1.75rem"><div style="font-size:1.95rem;font-weight:800;color:var(--nv)">EduKiosk</div><div style="font-size:.84rem;color:var(--mt);margin-top:3px">Plateforme d\'evaluation securisee</div></div><div class="rtabs"><button class="rtab on" id="tab-s">Eleve</button><button class="rtab" id="tab-t">Professeur</button></div><div id="lerr" style="display:none"></div><div id="form-s"><label>Prenom et nom</label><input type="text" id="inp-name" placeholder="ex : Marie Dupont"><label>Classe</label><input type="text" id="inp-cl" placeholder="ex : 3e8"></div><div id="form-t" style="display:none"><label>Code PIN</label><input type="password" id="inp-pw" placeholder="Saisissez votre PIN"><div style="font-size:.73rem;color:var(--mt);margin-top:-.6rem;margin-bottom:1rem">Defaut : PROF2024 · Secours : ****</div></div><button class="btn bn bfull" id="btn-ok">Continuer</button></div></div>');
-  g('#tab-s').onclick=function(){role='student';g('#tab-s').className='rtab on';g('#tab-t').className='rtab';g('#form-s').style.display='';g('#form-t').style.display='none';};
-  g('#tab-t').onclick=function(){role='teacher';g('#tab-t').className='rtab on';g('#tab-s').className='rtab';g('#form-t').style.display='';g('#form-s').style.display='none';};
-  function go(){
+  render(
+    '<div class="lbg"><div class="lcard">'
+      +'<div class="tc" style="margin-bottom:1.75rem">'
+        +'<div style="font-size:1.95rem;font-weight:800;color:var(--nv)">EduKiosk</div>'
+        +'<div style="font-size:.84rem;color:var(--mt);margin-top:3px">Plateforme d\'evaluation securisee</div>'
+      +'</div>'
+      +'<div id="lerr" style="display:none"></div>'
+      +'<label>Prenom et nom</label>'
+      +'<input type="text" id="inp-name" placeholder="ex : Marie Dupont" autocomplete="name">'
+      +'<label>Classe</label>'
+      +'<input type="text" id="inp-cl" placeholder="ex : 3e8" autocomplete="off">'
+      +'<label>Code d\'activite</label>'
+      +'<input type="text" id="inp-code" placeholder="Code a 6 chiffres" maxlength="6" autocomplete="off" '
+        +'style="font-size:1.5rem;letter-spacing:8px;text-align:center;font-weight:700">'
+      +'<div id="code-loading" style="display:none;text-align:center;color:var(--mt);font-size:.85rem;margin-top:-.5rem;margin-bottom:.85rem">Recherche de l\'activite...</div>'
+      +'<button class="btn bn bfull" id="btn-ok">Commencer</button>'
+      +'<div class="tc" style="margin-top:1.5rem">'
+        +'<button id="btn-prof" style="background:none;border:none;color:var(--mt);font-size:.75rem;cursor:pointer;text-decoration:underline">Acces professeur</button>'
+      +'</div>'
+    +'</div></div>'
+  );
+
+  function goStudent(){
     var err=g('#lerr');err.style.display='none';
-    if(role==='teacher'){if(checkPin(v('#inp-pw'),SL(K.p,'PROF2024'))){showTeacher();}else{err.className='merr';err.textContent='Code PIN incorrect.';err.style.display='';}}
-    else{var name=v('#inp-name').trim(),cl=v('#inp-cl').trim();if(!name){err.className='merr';err.textContent='Saisissez votre nom.';err.style.display='';return;}if(!cl){err.className='merr';err.textContent='Indiquez votre classe.';err.style.display='';return;}showStudentHome({name:name,classe:cl});}
+    var name=v('#inp-name').trim();
+    var cl=v('#inp-cl').trim();
+    var code=(v('#inp-code')||'').trim().replace(/\s/g,'');
+    if(!name){err.className='merr';err.textContent='Saisissez votre nom.';err.style.display='';return;}
+    if(!cl){err.className='merr';err.textContent='Indiquez votre classe.';err.style.display='';return;}
+    if(code.length!==6||!/^\d{6}$/.test(code)){err.className='merr';err.textContent='Le code doit contenir 6 chiffres.';err.style.display='';return;}
+
+    var btn=g('#btn-ok');btn.disabled=true;
+    var loading=g('#code-loading');if(loading)loading.style.display='';
+
+    // Chercher d'abord en local
+    var sess=getSession(code);
+    if(sess&&sess.active){
+      btn.disabled=false;if(loading)loading.style.display='none';
+      runKiosk(sess.data,sess.type,{name:name,classe:cl});
+      return;
+    }
+
+    // Sinon chercher dans le cloud
+    if(!API_URL){
+      btn.disabled=false;if(loading)loading.style.display='none';
+      err.className='merr';err.textContent='Code introuvable. Verifiez le code ou la connexion.';err.style.display='';
+      return;
+    }
+    fetch(API_URL+'?action=getByCode&code='+code+'&t='+Date.now())
+      .then(function(r){return r.json();})
+      .then(function(data){
+        btn.disabled=false;if(loading)loading.style.display='none';
+        if(data.ok&&data.session&&data.session.active){
+          // Sauvegarder localement pour usage offline
+          var sessions=SL(K.s,{});sessions[code]=data.session;SS(K.s,sessions);
+          runKiosk(data.session.data,data.session.type,{name:name,classe:cl});
+        }else{
+          err.className='merr';
+          err.textContent=data.session&&!data.session.active?'Cette session est terminee.':'Code introuvable. Verifiez aupres de votre professeur.';
+          err.style.display='';
+        }
+      })
+      .catch(function(){
+        btn.disabled=false;if(loading)loading.style.display='none';
+        err.className='merr';err.textContent='Connexion impossible. Verifiez le code et reessayez.';err.style.display='';
+      });
   }
-  g('#btn-ok').onclick=go;
-  ['#inp-name','#inp-cl','#inp-pw'].forEach(function(s){var el=g(s);if(el)el.onkeydown=function(e){if(e.key==='Enter')go();};});
+
+  g('#btn-ok').onclick=goStudent;
+  ['#inp-name','#inp-cl'].forEach(function(s){var el=g(s);if(el)el.onkeydown=function(e){if(e.key==='Enter')goStudent();};});
+  var ic=g('#inp-code');
+  if(ic){
+    ic.oninput=function(){this.value=this.value.replace(/\D/g,'').slice(0,6);};
+    ic.onkeydown=function(e){if(e.key==='Enter')goStudent();};
+  }
+
+  g('#btn-prof').onclick=function(){showProfLogin();};
+}
+
+function showProfLogin(){
+  render(
+    '<div class="lbg"><div class="lcard">'
+      +'<div class="tc" style="margin-bottom:1.75rem">'
+        +'<div style="font-size:1.95rem;font-weight:800;color:var(--nv)">EduKiosk</div>'
+        +'<div style="font-size:.84rem;color:var(--mt);margin-top:3px">Espace professeur</div>'
+      +'</div>'
+      +'<div id="perr" style="display:none"></div>'
+      +'<label>Code PIN</label>'
+      +'<input type="password" id="inp-pw" placeholder="Votre PIN" autocomplete="new-password">'
+      +'<div style="font-size:.73rem;color:var(--mt);margin-top:-.6rem;margin-bottom:1rem">Defaut : PROF2024 · Secours : ****</div>'
+      +'<button class="btn bn bfull" id="btn-pw">Connexion</button>'
+      +'<div class="tc" style="margin-top:1rem">'
+        +'<button id="btn-back" style="background:none;border:none;color:var(--mt);font-size:.75rem;cursor:pointer;text-decoration:underline">Retour ecran eleve</button>'
+      +'</div>'
+    +'</div></div>'
+  );
+  function go(){
+    var err=g('#perr');err.style.display='none';
+    if(checkPin(v('#inp-pw'),SL(K.p,'PROF2024'))){showTeacher();}
+    else{err.className='merr';err.textContent='Code PIN incorrect.';err.style.display='';}
+  }
+  g('#btn-pw').onclick=go;
+  var pw=g('#inp-pw');if(pw)pw.onkeydown=function(e){if(e.key==='Enter')go();};
+  g('#btn-back').onclick=showLogin;
 }
 
 /* ID FORM */
@@ -541,16 +662,7 @@ function showDone(){
 }
 
 function showStudentLogin(){
-  render('<div class="ibg"><div class="icard"><div class="tc" style="margin-bottom:1.75rem"><div style="font-size:1.95rem;font-weight:800;color:var(--nv)">EduKiosk</div><div style="font-size:.84rem;color:var(--mt);margin-top:3px">Nouvelle session</div></div><div id="lerr" style="display:none"></div><label>Prenom et nom</label><input type="text" id="inp-name" placeholder="ex : Marie Dupont"><label>Classe</label><input type="text" id="inp-cl" placeholder="ex : 3e8"><button class="btn bn bfull" id="btn-ok">Continuer</button></div></div>');
-  function go(){
-    var err=g('#lerr'),name=(g('#inp-name')||{value:''}).value.trim(),cl=(g('#inp-cl')||{value:''}).value.trim();
-    err.style.display='none';
-    if(!name){err.className='merr';err.textContent='Saisissez votre nom.';err.style.display='';return;}
-    if(!cl){err.className='merr';err.textContent='Indiquez votre classe.';err.style.display='';return;}
-    showStudentHome({name:name,classe:cl});
-  }
-  var b=g('#btn-ok');if(b)b.onclick=go;
-  ['#inp-name','#inp-cl'].forEach(function(s){var el=g(s);if(el)el.onkeydown=function(e){if(e.key==='Enter')go();};});
+  showLogin();
 }
 
 /* DOC VIEWER */
@@ -841,6 +953,29 @@ function showTeacher(){
     var rb=document.getElementById('btn-refresh');
     if(rb)rb.onclick=function(){tests=SL(K.t,[]);docs=SL(K.d,[]);results=SL(K.r,[]);mn.innerHTML='';bHome(mn);showToast('✓ Dashboard actualise');};
 
+    // Sessions actives
+    var activeSess=getActiveSessions();
+    if(activeSess.length){
+      var sDiv=document.createElement('div');
+      sDiv.style.cssText='background:linear-gradient(135deg,#0f2044,#1a3260);border-radius:var(--r);padding:1.25rem;margin-bottom:.9rem;color:#fff;';
+      var sHtml='<div style="font-weight:700;font-size:.97rem;margin-bottom:1rem">&#9654; Sessions actives ('+activeSess.length+')</div><div style="display:flex;gap:10px;flex-wrap:wrap">';
+      activeSess.forEach(function(s){
+        sHtml+='<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:.75rem 1rem;min-width:180px">'
+          +'<div style="font-size:.72rem;opacity:.6;text-transform:uppercase;letter-spacing:1px">'+(s.type==='exam'?'Test':'Document')+'</div>'
+          +'<div style="font-weight:600;font-size:.9rem;margin:.3rem 0">'+s.title+'</div>'
+          +'<div style="font-size:2rem;font-weight:800;color:var(--gd);letter-spacing:8px;font-family:monospace">'+s.code+'</div>'
+          +(s.type==='doc'?'<div style="font-size:.75rem;opacity:.7;margin-top:4px">Sortie : '+s.exitPin+'</div>':'')
+          +'<button data-stop="'+s.code+'" style="margin-top:8px;background:rgba(255,80,80,.25);border:1px solid rgba(255,80,80,.4);color:#ffaaaa;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:.75rem;">&#9632; Arreter</button>'
+        +'</div>';
+      });
+      sHtml+='</div>';
+      sDiv.innerHTML=sHtml;
+      sDiv.querySelectorAll('[data-stop]').forEach(function(btn){
+        btn.onclick=function(){deactivateSession(btn.dataset.stop);mn.innerHTML='';bHome(mn);showToast('Session arretee.');};
+      });
+      mn.appendChild(sDiv);
+    }
+
     // Infractions — toujours affichées
     var withInfr=results.filter(function(r){return (r.infractions||0)>0||r.abandoned;});
     var iDiv=document.createElement('div');
@@ -878,14 +1013,60 @@ function showTeacher(){
     if(results.length)mn.appendChild(bResTable([].concat(results).reverse().slice(0,15)));
   }
 
+  function showSessionModal(type, item){
+    var code=genCode();
+    var exitPin=genCode().slice(0,4);
+    var sess={
+      code:code,
+      type:type,
+      title:item.title,
+      subject:item.subject,
+      exitPin:exitPin,
+      created:Date.now(),
+      active:true,
+      data:type==='doc'?Object.assign({},item,{exitPin:exitPin}):item
+    };
+    saveSession(sess);
+    bNav();bMain(); // rafraîchir pour montrer session active
+
+    var old=document.getElementById('sess-modal-bg');if(old)old.remove();
+    var bg=document.createElement('div');bg.className='mbg';bg.id='sess-modal-bg';
+    bg.innerHTML='<div class="modal" style="max-width:460px;text-align:center">'
+      +'<div style="font-size:.85rem;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem">'+(type==='exam'?'Test':'Document')+'</div>'
+      +'<div style="font-weight:800;font-size:1.1rem;color:var(--nv);margin-bottom:1.5rem">'+item.title+'</div>'
+      +'<div style="background:var(--nv);border-radius:14px;padding:1.75rem;margin-bottom:1.25rem">'
+        +'<div style="font-size:.72rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem">Code d\'activite — Affichez au tableau</div>'
+        +'<div style="font-size:3.5rem;font-weight:800;color:var(--gd);letter-spacing:12px;font-family:monospace">'+code+'</div>'
+        +(type==='doc'?'<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.15)">'
+          +'<div style="font-size:.72rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem">Code de sortie (fin de consultation)</div>'
+          +'<div style="font-size:2rem;font-weight:800;color:var(--gd2,#f5c85a);letter-spacing:8px;font-family:monospace">'+exitPin+'</div>'
+        +'</div>':'')
+      +'</div>'
+      +'<div class="minfo" style="margin-bottom:1.25rem;text-align:left">Les eleves ouvrent EduKiosk, saisissent leur nom, leur classe et ce code a 6 chiffres pour demarrer.</div>'
+      +'<div style="display:flex;gap:10px">'
+        +'<button class="btn br" style="flex:1" id="sess-stop">&#9632; Arreter la session</button>'
+        +'<button class="btn bo" style="flex:1" id="sess-close">Fermer</button>'
+      +'</div>'
+    +'</div>';
+    document.body.appendChild(bg);
+    bg.querySelector('#sess-close').onclick=function(){bg.remove();};
+    bg.querySelector('#sess-stop').onclick=function(){
+      deactivateSession(code);
+      bg.remove();
+      bNav();bMain();
+      showToast('Session '+code+' arretee.');
+    };
+    bg.onclick=function(e){if(e.target===bg)bg.remove();};
+  }
+
   function bTestList(mn){
     mn.innerHTML='<div class="ch mb1"><h1 class="pg" style="margin:0">Tests ('+tests.length+')</h1><button class="btn bg" id="nt">+ Nouveau</button></div>';
     var nb=document.getElementById('nt');if(nb)nb.onclick=function(){creating='test';bNav();bMain();};
     if(!tests.length){mn.insertAdjacentHTML('beforeend','<div class="card tc" style="color:var(--mt)">Aucun test cree.</div>');return;}
     tests.forEach(function(t){
       var d=document.createElement('div');d.className='card';
-      d.innerHTML='<div class="ch"><div><div class="ct">'+t.title+'</div><div class="cm">'+t.subject+' · '+t.duration+'min · '+t.questions.length+'q'+(t.shuffle?' · <span style="color:#6d4aff;font-weight:700">Q.aleatoires</span>':'')+(t.noBack?' · <span style="color:var(--rd);font-weight:700">sans retour</span>':'')+'</div><div style="font-size:.74rem;color:var(--mt);margin-top:4px">'+results.filter(function(r){return r.testId===t.id;}).length+' resultat(s)</div></div><div class="row" style="gap:7px;flex-wrap:wrap"><span class="bdg '+(t.active?'b-gn':'b-rd')+'">'+(t.active?'Actif':'Inactif')+'</span><button class="btn bn bsm" data-a="xml" data-id="'+t.id+'">XML</button><button class="btn bn bsm" data-a="sh" data-id="'+t.id+'">Partager</button><button class="btn bo bsm" data-a="tog" data-id="'+t.id+'">'+(t.active?'Desactiver':'Activer')+'</button><button class="btn br bsm" data-a="del" data-id="'+t.id+'">X</button></div></div>';
-      d.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){var id=+b.dataset.id,t2=tests.find(function(x){return x.id===id;});if(!t2)return;if(b.dataset.a==='xml')dlXML(t2);else if(b.dataset.a==='sh')showShareModal('exam',t2);else if(b.dataset.a==='tog'){tests=tests.map(function(x){return x.id===id?Object.assign({},x,{active:!x.active}):x;});svT();bMain();}else if(b.dataset.a==='del'){customConfirm('Supprimer le test "'+t2.title+'" ?',function(){tests=tests.filter(function(x){return x.id!==id;});svT();bMain();});}};});
+      d.innerHTML='<div class="ch"><div><div class="ct">'+t.title+'</div><div class="cm">'+t.subject+' · '+t.duration+'min · '+t.questions.length+'q'+(t.shuffle?' · <span style="color:#6d4aff;font-weight:700">Q.aleatoires</span>':'')+(t.noBack?' · <span style="color:var(--rd);font-weight:700">sans retour</span>':'')+'</div><div style="font-size:.74rem;color:var(--mt);margin-top:4px">'+results.filter(function(r){return r.testId===t.id;}).length+' resultat(s)</div></div><div class="row" style="gap:7px;flex-wrap:wrap"><button class="btn bk bsm" data-a="sess" data-id="'+t.id+'">&#9654; Demarrer session</button><span class="bdg '+(t.active?'b-gn':'b-rd')+'">'+(t.active?'Actif':'Inactif')+'</span><button class="btn bn bsm" data-a="xml" data-id="'+t.id+'">XML</button><button class="btn bo bsm" data-a="tog" data-id="'+t.id+'">'+(t.active?'Desactiver':'Activer')+'</button><button class="btn br bsm" data-a="del" data-id="'+t.id+'">X</button></div></div>';
+      d.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){var id=+b.dataset.id,t2=tests.find(function(x){return x.id===id;});if(!t2)return;if(b.dataset.a==='xml')dlXML(t2);else if(b.dataset.a==='sess')showSessionModal('exam',t2);else if(b.dataset.a==='tog'){tests=tests.map(function(x){return x.id===id?Object.assign({},x,{active:!x.active}):x;});svT();bMain();}else if(b.dataset.a==='del'){customConfirm('Supprimer le test "'+t2.title+'" ?',function(){tests=tests.filter(function(x){return x.id!==id;});svT();bMain();});}};});
       mn.appendChild(d);
     });
   }
@@ -974,8 +1155,8 @@ function showTeacher(){
     if(!docs.length){mn.insertAdjacentHTML('beforeend','<div class="card tc" style="color:var(--mt)">Aucun document.</div>');return;}
     docs.forEach(function(d){
       var div=document.createElement('div');div.className='card';
-      div.innerHTML='<div class="ch"><div><div class="ct">'+d.title+'</div><div class="cm">'+d.subject+(d.docType==='link'?' <span class="bdg b-tl" style="font-size:.65rem">Lien</span>':'')+'</div><div style="font-size:.78rem;color:var(--mt);margin-top:4px;max-height:44px;overflow:hidden;opacity:.8">'+(d.docType==='link'?(d.linkUrl||'').slice(0,80):'('+d.docType+')')+'</div></div><div class="row" style="gap:7px"><button class="btn bn bsm" data-a="sh" data-id="'+d.id+'">Partager (PIN)</button><button class="btn br bsm" data-a="del" data-id="'+d.id+'">X</button></div></div>';
-      div.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){var id=+b.dataset.id,d2=docs.find(function(x){return x.id===id;});if(!d2)return;if(b.dataset.a==='sh')showShareModal('doc',d2);else if(b.dataset.a==='del'){customConfirm('Supprimer le document "'+d2.title+'" ?',function(){docs=docs.filter(function(x){return x.id!==id;});svD();bMain();});}};});
+      div.innerHTML='<div class="ch"><div><div class="ct">'+d.title+'</div><div class="cm">'+d.subject+(d.docType==='link'?' <span class="bdg b-tl" style="font-size:.65rem">Lien</span>':'')+'</div><div style="font-size:.78rem;color:var(--mt);margin-top:4px;max-height:44px;overflow:hidden;opacity:.8">'+(d.docType==='link'?(d.linkUrl||'').slice(0,80):'('+d.docType+')')+'</div></div><div class="row" style="gap:7px"><button class="btn bk bsm" data-a="sess" data-id="'+d.id+'">&#9654; Demarrer session</button><button class="btn br bsm" data-a="del" data-id="'+d.id+'">X</button></div></div>';
+      div.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){var id=+b.dataset.id,d2=docs.find(function(x){return x.id===id;});if(!d2)return;if(b.dataset.a==='sess')showSessionModal('doc',d2);else if(b.dataset.a==='del'){customConfirm('Supprimer le document "'+d2.title+'" ?',function(){docs=docs.filter(function(x){return x.id!==id;});svD();bMain();});}};});
       mn.appendChild(div);
     });
   }
