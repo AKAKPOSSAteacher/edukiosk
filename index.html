@@ -1671,21 +1671,42 @@ function showStudentHome(user){
     document.body.appendChild(banner);
   }
 
-  // Restaurer session kiosk si l'app a été fermée pendant un examen
+  // Restaurer session kiosk si l'app a été fermée pendant un examen/document
   var ks=SL(K.k,null);
   if(ks&&ks.payload&&ks.student){
-    // Session interrompue — remettre le verrou immédiatement
-    _infractions=(ks.infractions||0)+1; // compter la fermeture comme infraction
-    runKiosk(ks.payload,ks.type,ks.student);
-    // Afficher le verrou directement
-    setTimeout(function(){
-      var lk=document.getElementById('lock');
-      if(lk){
-        lk.style.display='flex';
-        var li=document.getElementById('l-infr');
-        if(li)li.textContent='⚠ Application fermee — '+_infractions+' infraction(s)';
+    // Afficher IMMÉDIATEMENT un écran de verrou complet avant tout
+    _infractions=(ks.infractions||0)+1;
+    var overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;background:#06061a;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;color:#fff;padding:2rem;text-align:center;';
+    overlay.innerHTML='<div style="font-size:3.5rem;animation:pulse 2s infinite">&#128274;</div>'
+      +'<div style="font-size:1.8rem;font-weight:800;color:#ff6b6b">SESSION VERROUILLEE</div>'
+      +'<div style="color:rgba(255,255,255,.6);max-width:340px;font-size:.9rem">Application fermee pendant la session.</div>'
+      +'<div style="background:rgba(255,80,80,.18);border:1px solid rgba(255,80,80,.35);padding:5px 15px;border-radius:20px;font-size:.8rem;color:#ff9090">&#9888; '+_infractions+' infraction(s)</div>'
+      +'<div style="display:flex;flex-direction:column;align-items:center;gap:9px;width:100%;max-width:280px;margin-top:.5rem">'
+        +'<input type="password" id="restore-pin" maxlength="30" placeholder="Code PIN professeur" autocomplete="new-password" style="text-align:center;letter-spacing:4px;font-size:1.1rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;padding:12px;width:100%;outline:none;">'
+        +'<div id="restore-err" style="color:#ff8080;font-size:.8rem;display:none">Code incorrect</div>'
+        +'<button id="restore-ok" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--gd);color:var(--nv);font-weight:700;font-size:.95rem;cursor:pointer;">Deverrouiller</button>'
+        +'<button id="restore-abort" style="background:transparent;border:none;color:rgba(255,255,255,.3);font-size:.76rem;cursor:pointer;margin-top:4px;">Abandonner la session</button>'
+      +'</div>';
+    document.body.appendChild(overlay);
+
+    function tryRestorePin(){
+      var pin=document.getElementById('restore-pin');
+      if(!pin)return;
+      if(checkPin(pin.value,SL(K.p,'PROF2024'))){
+        overlay.remove();
+        runKiosk(ks.payload,ks.type,ks.student);
+      }else{
+        var er=document.getElementById('restore-err');
+        if(er){er.style.display='';setTimeout(function(){er.style.display='none';},1700);}
+        pin.value='';
       }
-    },300);
+    }
+    var rok=document.getElementById('restore-ok');if(rok)rok.onclick=tryRestorePin;
+    var rpin=document.getElementById('restore-pin');if(rpin)rpin.onkeydown=function(e){if(e.key==='Enter')tryRestorePin();};
+    var rab=document.getElementById('restore-abort');if(rab)rab.onclick=function(){
+      SS(K.k,null);overlay.remove();showLogin();
+    };
     return;
   }
 
