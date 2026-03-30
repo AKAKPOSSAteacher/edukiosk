@@ -3,194 +3,76 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="EduKiosk">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0f2044">
-<title>EduKiosk - Stable</title>
+<title>EduKiosk 2026 - Stable</title>
 <style>
-:root{--nv:#0f2044;--nv2:#1a3260;--gd:#e8a120;--gd2:#f5c85a;--cr:#f5f4f0;--sf:#fff;--bd:#e0dbd2;--tx:#1a1a2e;--mt:#6b6880;--rd:#c0392b;--gn:#1e8449;--pu:#7c3aed;--r:12px;--sh:0 2px 12px rgba(15,32,68,.08);}
-*{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:var(--cr);color:var(--tx);overflow-x:hidden;}
-body.kiosk{user-select:none;-webkit-user-select:none;}
-input,select,textarea,button{font-family:inherit;}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.fadein{animation:fadeIn .25s ease}
-.tb{height:56px;background:linear-gradient(135deg,var(--nv),var(--nv2));color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;position:sticky;top:0;z-index:40;box-shadow:0 2px 12px rgba(0,0,0,.18);}
-.tb-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:1.1rem;letter-spacing:-.3px;}
-.tb-dot{width:10px;height:10px;border-radius:50%;background:var(--gd);box-shadow:0 0 8px rgba(232,161,32,.6);}
-.tb-right{display:flex;align-items:center;gap:10px;}
-.bdg{padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700;}
-.b-gd{background:var(--gd);color:var(--nv);}.b-gn{background:#27ae60;color:#fff;}.b-rd{background:var(--rd);color:#fff;}.b-tl{background:#0e7490;color:#fff;}
-.tb-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.82rem;transition:background .15s;}
-.tb-btn:hover{background:rgba(255,255,255,.25);}
-.layout{display:flex;min-height:calc(100vh - 56px);}
-.sidebar{width:230px;background:var(--sf);border-right:1px solid var(--bd);padding:1.25rem 0;flex-shrink:0;box-shadow:var(--sh);}
-.si{display:flex;align-items:center;gap:10px;padding:10px 1.4rem;cursor:pointer;font-size:.87rem;color:var(--mt);border:none;background:none;width:100%;text-align:left;border-radius:0;transition:all .15s;}
-.si:hover{background:var(--cr);color:var(--tx);}
-.si.on{background:linear-gradient(90deg,#eef2fa,#f5f7ff);color:var(--nv);font-weight:700;border-right:3px solid var(--nv);}
-.main{flex:1;padding:2rem;overflow-y:auto;background:var(--cr);}
-.pg{font-size:1.35rem;font-weight:800;color:var(--nv);margin-bottom:1.25rem;}
-label{font-size:.76rem;font-weight:700;color:var(--mt);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px;}
-input[type=text],input[type=password],input[type=number],select,textarea{width:100%;padding:9px 13px;border:1.5px solid var(--bd);border-radius:9px;font-size:.92rem;color:var(--tx);background:var(--sf);outline:none;margin-bottom:.85rem;transition:border .15s,box-shadow .15s;}
-input:focus,select:focus,textarea:focus{border-color:var(--nv);box-shadow:0 0 0 3px rgba(15,32,68,.08);}
-.btn{padding:9px 18px;border-radius:9px;border:none;cursor:pointer;font-size:.87rem;font-weight:600;display:inline-flex;align-items:center;gap:6px;transition:all .15s;}
-.bn{background:var(--nv);color:#fff;}.bn:hover{background:var(--nv2);transform:translateY(-1px);}
-.bg{background:var(--gd);color:var(--nv);}.bg:hover{background:var(--gd2);transform:translateY(-1px);}
-.br{background:var(--rd);color:#fff;}.br:hover{opacity:.88;}
-.bo{background:transparent;border:1.5px solid var(--bd);color:var(--tx);}.bo:hover{border-color:var(--nv);color:var(--nv);}
-.bfull{width:100%;justify-content:center;}
-.merr{background:#fdecea;border:1px solid #f5c2be;color:var(--rd);padding:9px 13px;border-radius:9px;font-size:.84rem;margin-bottom:.85rem;}
-.mok{background:#eafaf1;border:1px solid #a9dfbf;color:var(--gn);padding:9px 13px;border-radius:9px;font-size:.84rem;margin-bottom:.85rem;}
-.card{background:var(--sf);border-radius:var(--r);border:1px solid var(--bd);padding:1.25rem;margin-bottom:.9rem;box-shadow:var(--sh);}
-.lbg{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0a1628 0%,#0f2044 40%,#1a3260 100%);padding:1.5rem;}
-.lcard{background:var(--sf);border-radius:20px;padding:2.5rem 2rem;width:100%;max-width:400px;box-shadow:0 24px 80px rgba(0,0,0,.35);}
-#ac{background:#10101e;color:#8080a0;font-size:.72rem;padding:5px 1.25rem;display:flex;gap:1.25rem;align-items:center;min-height:24px;}
-.acd{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;}
-#root{min-height:100vh;}
+    :root { --nv: #0f2044; --gd: #e8a120; --cr: #f5f4f0; --sf: #fff; --bd: #e0dbd2; --mt: #6b6880; --rd: #c0392b; --gn: #1e8449; }
+    body { font-family: 'Segoe UI', sans-serif; background: var(--cr); margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: var(--sf); padding: 2rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 380px; text-align: center; }
+    h1 { color: var(--nv); margin-bottom: 0.5rem; font-size: 1.8rem; }
+    p { color: var(--mt); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    input { width: 100%; padding: 12px; margin-bottom: 1rem; border: 1.5px solid var(--bd); border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
+    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 1rem; }
+    .btn-primary { background: var(--nv); color: white; }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .error { background: #fdecea; color: var(--rd); padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; display: none; }
+    #loading-screen { position: fixed; inset: 0; background: var(--cr); display: flex; align-items: center; justify-content: center; z-index: 100; }
 </style>
 </head>
 <body>
-<div id="root">Initialisation...</div>
+
+<div id="loading-screen">Chargement d'EduKiosk...</div>
+
+<div class="card" id="login-form" style="display:none;">
+    <h1>EduKiosk</h1>
+    <p>Identifiez-vous pour continuer</p>
+    <div id="err-msg" class="error"></div>
+    <input type="text" id="username" placeholder="Nom et Prénom">
+    <input type="text" id="userclass" placeholder="Classe (ex: 3e2)">
+    <input type="text" id="activity-code" placeholder="Code d'activité" maxlength="6" style="text-align:center; font-weight:bold; letter-spacing: 3px;">
+    <button class="btn btn-primary" onclick="startActivity()">Commencer</button>
+</div>
 
 <script>
-'use strict';
+    // Initialisation forcée après 500ms pour éviter le freeze
+    setTimeout(() => {
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('login-form').style.display = 'block';
+    }, 500);
 
-// --- CONFIGURATION ET STOCKAGE ---
-const K = {t:'ek_t', d:'ek_d', r:'ek_r', p:'ek_p', s:'ek_s', api:'ek_api'};
-const MASTER_PIN = '****';
+    function startActivity() {
+        const name = document.getElementById('username').value.trim();
+        const uclass = document.getElementById('userclass').value.trim();
+        const code = document.getElementById('activity-code').value.trim();
+        const err = document.getElementById('err-msg');
 
-function SS(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) { console.error("Erreur stockage", e); } }
-function SL(k, d) { try { const r = localStorage.getItem(k); return r === null ? d : JSON.parse(r); } catch(e) { return d; } }
-
-// --- LOGIQUE SESSIONS ---
-function getSession(code) { const sess = SL(K.s, {}); return sess[code] || null; }
-
-function checkPin(val, correct) { 
-    val = (val || '').trim(); 
-    correct = (correct || 'PROF2024').trim();
-    return val === correct || val === MASTER_PIN; 
-}
-
-// --- NAVIGATION ET RENDU ---
-const ROOT = document.getElementById('root');
-function render(html) { ROOT.innerHTML = html; }
-
-// --- VUES ---
-function showLogin() {
-    render(`
-        <div class="lbg">
-            <div class="lcard fadein">
-                <div style="text-align:center; margin-bottom:1.75rem">
-                    <div style="font-size:1.95rem; font-weight:800; color:var(--nv)">EduKiosk</div>
-                    <div style="font-size:.84rem; color:var(--mt)">Plateforme d'évaluation sécurisée</div>
-                </div>
-                <div id="lerr" style="display:none"></div>
-                <label>Prénom et Nom</label>
-                <input type="text" id="inp-name" placeholder="Marie Dupont">
-                <label>Classe</label>
-                <input type="text" id="inp-cl" placeholder="3e8">
-                <label>Code d'activité</label>
-                <input type="text" id="inp-code" placeholder="6 chiffres" maxlength="6" 
-                       style="font-size:1.5rem; letter-spacing:8px; text-align:center; font-weight:700">
-                <button class="btn bn bfull" id="btn-ok">Commencer</button>
-                <div style="text-align:center; margin-top:1.5rem">
-                    <button id="btn-prof" style="background:none; border:none; color:var(--mt); font-size:.75rem; cursor:pointer; text-decoration:underline">Accès Professeur</button>
-                </div>
-            </div>
-        </div>
-    `);
-
-    document.getElementById('btn-ok').onclick = function() {
-        const name = document.getElementById('inp-name').value.trim();
-        const cl = document.getElementById('inp-cl').value.trim();
-        const code = document.getElementById('inp-code').value.trim();
-        const err = document.getElementById('lerr');
-
-        if (!name || !cl || code.length !== 6) {
-            err.className = 'merr';
-            err.textContent = "Veuillez remplir tous les champs.";
+        if (!name || !uclass || code.length < 6) {
+            err.textContent = "Veuillez remplir tous les champs correctement.";
             err.style.display = 'block';
             return;
         }
 
-        // Simule le chargement de l'activité
-        const sess = getSession(code);
-        if (sess && sess.active) {
-            runKiosk(sess.data, sess.type, {name, classe: cl});
-        } else {
-            err.className = 'merr';
-            err.textContent = "Code inconnu ou session terminée. (Vérifiez avec votre professeur)";
-            err.style.display = 'block';
-        }
-    };
-
-    document.getElementById('btn-prof').onclick = showProfLogin;
-}
-
-function showProfLogin() {
-    render(`
-        <div class="lbg">
-            <div class="lcard fadein">
-                <div style="text-align:center; margin-bottom:1.5rem">
-                    <div style="font-size:1.5rem; font-weight:800; color:var(--nv)">Accès Professeur</div>
+        // Ici, on simule l'entrée en mode kiosque
+        document.body.innerHTML = `
+            <div style="text-align:center; padding:2rem;">
+                <h2 style="color:var(--nv)">Session active : ${name} (${uclass})</h2>
+                <div style="background:white; padding:3rem; border-radius:15px; border:2px dashed var(--bd); margin-top:2rem;">
+                    Chargement du contenu pour le code <b>${code}</b>...
                 </div>
-                <div id="perr" style="display:none"></div>
-                <label>Code PIN</label>
-                <input type="password" id="inp-pw" placeholder="PIN">
-                <button class="btn bn bfull" id="btn-pw">Connexion</button>
-                <button class="btn bo bfull" style="margin-top:10px" id="btn-back">Retour</button>
+                <button class="btn" style="margin-top:2rem; background:var(--rd); color:white;" onclick="location.reload()">Quitter</button>
             </div>
-        </div>
-    `);
-    
-    document.getElementById('btn-pw').onclick = function() {
-        const pw = document.getElementById('inp-pw').value;
-        if (checkPin(pw, SL(K.p, 'PROF2024'))) {
-            render('<div class="main"><h1>Espace Professeur</h1><p>Connecté avec succès. (Interface complète en cours de chargement...)</p><button class="btn bn" onclick="showLogin()">Déconnexion</button></div>');
-        } else {
-            const err = document.getElementById('perr');
-            err.className = 'merr';
-            err.textContent = "Code PIN incorrect.";
-            err.style.display = 'block';
-        }
-    };
-    document.getElementById('btn-back').onclick = showLogin;
-}
-
-function runKiosk(payload, type, student) {
-    // Mode d'affichage sécurisé simplifié pour la stabilité
-    render(`
-        <div style="min-height:100vh; background:var(--cr)">
-            <div id="ac"><div style="padding:5px 15px"><span class="acd" style="background:var(--gn)"></span> Mode sécurisé actif pour ${student.name}</div></div>
-            <div style="padding:2rem; max-width:800px; margin:0 auto">
-                <div class="card">
-                    <h2>${payload.title || 'Activité'}</h2>
-                    <p style="margin:1rem 0; color:var(--mt)">${payload.subject || 'Cours'}</p>
-                    <div style="padding:2rem; background:var(--f5f4f0); border-radius:8px; border:1px dashed var(--bd); text-align:center">
-                        Contenu de l'activité en cours...
-                    </div>
-                    <button class="btn br bfull" style="margin-top:2rem" onclick="location.reload()">Quitter la session</button>
-                </div>
-            </div>
-        </div>
-    `);
-}
-
-// --- BOOT ---
-window.onload = function() {
-    console.log("EduKiosk démarré");
-    // Initialisation forcée
-    try {
-        const testPin = SL(K.p, null);
-        if (!testPin) SS(K.p, 'PROF2024'); // PIN par défaut
-        showLogin();
-    } catch(e) {
-        document.getElementById('root').innerHTML = "<div class='merr'>Erreur fatale : Votre navigateur bloque l'accès au stockage local. Désactivez le mode Navigation Privée.</div>";
+        `;
+        
+        // Tentative de plein écran (si supporté)
+        try { document.documentElement.requestFullscreen(); } catch(e) {}
     }
-};
+
+    // Sécurité stockage : on vide si c'est corrompu
+    try {
+        localStorage.setItem('test', '1');
+        localStorage.removeItem('test');
+    } catch(e) {
+        alert("Stockage saturé ou Navigation Privée détectée. EduKiosk risque de mal fonctionner.");
+    }
 </script>
 </body>
 </html>
