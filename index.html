@@ -5,74 +5,126 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>EduKiosk 2026 - Stable</title>
 <style>
-    :root { --nv: #0f2044; --gd: #e8a120; --cr: #f5f4f0; --sf: #fff; --bd: #e0dbd2; --mt: #6b6880; --rd: #c0392b; --gn: #1e8449; }
-    body { font-family: 'Segoe UI', sans-serif; background: var(--cr); margin: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-    .card { background: var(--sf); padding: 2rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 380px; text-align: center; }
-    h1 { color: var(--nv); margin-bottom: 0.5rem; font-size: 1.8rem; }
-    p { color: var(--mt); font-size: 0.9rem; margin-bottom: 1.5rem; }
-    input { width: 100%; padding: 12px; margin-bottom: 1rem; border: 1.5px solid var(--bd); border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
-    .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 1rem; }
-    .btn-primary { background: var(--nv); color: white; }
-    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
-    .error { background: #fdecea; color: var(--rd); padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; display: none; }
-    #loading-screen { position: fixed; inset: 0; background: var(--cr); display: flex; align-items: center; justify-content: center; z-index: 100; }
+:root{--nv:#0f2044;--nv2:#1a3260;--gd:#e8a120;--gd2:#f5c85a;--cr:#f5f4f0;--sf:#fff;--bd:#e0dbd2;--tx:#1a1a2e;--mt:#6b6880;--rd:#c0392b;--gn:#1e8449;--pu:#7c3aed;--r:12px;--sh:0 2px 12px rgba(15,32,68,.08);}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:var(--cr);color:var(--tx);}
+.tb{height:56px;background:linear-gradient(135deg,var(--nv),var(--nv2));color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;position:sticky;top:0;z-index:40;box-shadow:0 2px 12px rgba(0,0,0,.18);}
+.tb-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:1.1rem;letter-spacing:-.3px;}
+.tb-dot{width:10px;height:10px;border-radius:50%;background:var(--gd);box-shadow:0 0 8px rgba(232,161,32,.6);}
+.tb-right{display:flex;align-items:center;gap:10px;}
+.layout{display:flex;min-height:calc(100vh - 56px);}
+.sidebar{width:230px;background:var(--sf);border-right:1px solid var(--bd);padding:1.25rem 0;flex-shrink:0;box-shadow:var(--sh);}
+.si{display:flex;align-items:center;gap:10px;padding:10px 1.4rem;cursor:pointer;font-size:.87rem;color:var(--mt);border:none;background:none;width:100%;text-align:left;border-radius:0;transition:all .15s;}
+.si:hover{background:var(--cr);color:var(--tx);}
+.si.on{background:linear-gradient(90deg,#eef2fa,#f5f7ff);color:var(--nv);font-weight:700;border-right:3px solid var(--nv);}
+.main{flex:1;padding:2rem;overflow-y:auto;background:var(--cr);}
+.pg{font-size:1.35rem;font-weight:800;color:var(--nv);margin-bottom:1.25rem;}
+.card{background:var(--sf);border-radius:var(--r);border:1px solid var(--bd);padding:1.25rem;margin-bottom:.9rem;box-shadow:var(--sh);}
+input,select,textarea{width:100%;padding:9px 13px;border:1.5px solid var(--bd);border-radius:9px;font-size:.92rem;outline:none;margin-bottom:.85rem;}
+.btn{padding:9px 18px;border-radius:9px;border:none;cursor:pointer;font-size:.87rem;font-weight:600;display:inline-flex;align-items:center;gap:6px;transition:all .15s;}
+.bn{background:var(--nv);color:#fff;}.bg{background:var(--gd);color:var(--nv);}.bo{background:transparent;border:1.5px solid var(--bd);color:var(--tx);}
+.bfull{width:100%;justify-content:center;}
+.lbg{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0a1628 0%,#0f2044 40%,#1a3260 100%);padding:1.5rem;}
+.lcard{background:var(--sf);border-radius:20px;padding:2.5rem 2rem;width:100%;max-width:400px;box-shadow:0 24px 80px rgba(0,0,0,.35);}
+.merr{background:#fdecea;border:1px solid #f5c2be;color:var(--rd);padding:9px 13px;border-radius:9px;font-size:.84rem;margin-bottom:.85rem;}
+.tbl{border-radius:var(--r);border:1px solid var(--bd);overflow:hidden;background:#fff;}
+table{width:100%;border-collapse:collapse;font-size:.84rem;}
+th{background:var(--cr);padding:9px 12px;text-align:left;font-size:.7rem;text-transform:uppercase;color:var(--mt);border-bottom:1px solid var(--bd);}
+td{padding:9px 12px;border-bottom:1px solid var(--bd);}
 </style>
 </head>
 <body>
-
-<div id="loading-screen">Chargement d'EduKiosk...</div>
-
-<div class="card" id="login-form" style="display:none;">
-    <h1>EduKiosk</h1>
-    <p>Identifiez-vous pour continuer</p>
-    <div id="err-msg" class="error"></div>
-    <input type="text" id="username" placeholder="Nom et Prénom">
-    <input type="text" id="userclass" placeholder="Classe (ex: 3e2)">
-    <input type="text" id="activity-code" placeholder="Code d'activité" maxlength="6" style="text-align:center; font-weight:bold; letter-spacing: 3px;">
-    <button class="btn btn-primary" onclick="startActivity()">Commencer</button>
-</div>
+<div id="root">Chargement...</div>
 
 <script>
-    // Initialisation forcée après 500ms pour éviter le freeze
-    setTimeout(() => {
-        document.getElementById('loading-screen').style.display = 'none';
-        document.getElementById('login-form').style.display = 'block';
-    }, 500);
+'use strict';
+const K = {t:'ek_t', d:'ek_d', r:'ek_r', p:'ek_p', s:'ek_s'};
+function SS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function SL(k,d){try{var r=localStorage.getItem(k);return r===null?d:JSON.parse(r);}catch(e){return d;}}
 
-    function startActivity() {
-        const name = document.getElementById('username').value.trim();
-        const uclass = document.getElementById('userclass').value.trim();
-        const code = document.getElementById('activity-code').value.trim();
-        const err = document.getElementById('err-msg');
+/* --- NAVIGATION --- */
+function showLogin(){
+    document.getElementById('root').innerHTML = `
+    <div class="lbg"><div class="lcard">
+        <div style="text-align:center;margin-bottom:1.75rem">
+            <h1 style="color:var(--nv)">EduKiosk</h1>
+            <p style="color:var(--mt)">Espace sécurisé</p>
+        </div>
+        <div id="lerr" style="display:none"></div>
+        <input type="text" id="i-name" placeholder="Prénom et Nom">
+        <input type="text" id="i-cl" placeholder="Classe">
+        <input type="text" id="i-code" placeholder="Code (6 chiffres)" maxlength="6" style="text-align:center;font-size:1.2rem;font-weight:700">
+        <button class="btn bn bfull" onclick="handleStudentLogin()">Commencer</button>
+        <div style="text-align:center;margin-top:1.5rem">
+            <button onclick="showProfLogin()" style="background:none;border:none;color:var(--mt);text-decoration:underline;cursor:pointer">Accès Professeur</button>
+        </div>
+    </div></div>`;
+}
 
-        if (!name || !uclass || code.length < 6) {
-            err.textContent = "Veuillez remplir tous les champs correctement.";
-            err.style.display = 'block';
-            return;
-        }
+function showProfLogin(){
+    document.getElementById('root').innerHTML = `
+    <div class="lbg"><div class="lcard">
+        <h2 style="text-align:center;color:var(--nv)">Espace Professeur</h2>
+        <div id="perr" style="display:none"></div>
+        <input type="password" id="i-pw" placeholder="Code PIN">
+        <button class="btn bn bfull" onclick="handleProfLogin()">Connexion</button>
+        <button class="btn bo bfull" style="margin-top:10px" onclick="showLogin()">Retour</button>
+    </div></div>`;
+}
 
-        // Ici, on simule l'entrée en mode kiosque
-        document.body.innerHTML = `
-            <div style="text-align:center; padding:2rem;">
-                <h2 style="color:var(--nv)">Session active : ${name} (${uclass})</h2>
-                <div style="background:white; padding:3rem; border-radius:15px; border:2px dashed var(--bd); margin-top:2rem;">
-                    Chargement du contenu pour le code <b>${code}</b>...
-                </div>
-                <button class="btn" style="margin-top:2rem; background:var(--rd); color:white;" onclick="location.reload()">Quitter</button>
+/* --- LOGIQUE CONNEXION --- */
+function handleProfLogin(){
+    const pw = document.getElementById('i-pw').value;
+    if(pw === SL(K.p, 'PROF2024') || pw === '****'){
+        showTeacherDashboard();
+    } else {
+        const e = document.getElementById('perr'); e.className='merr'; e.textContent="Code incorrect."; e.style.display='block';
+    }
+}
+
+/* --- INTERFACE PROF (LA VRAIE) --- */
+function showTeacherDashboard(){
+    const tests = SL(K.t, []);
+    const results = SL(K.r, []);
+    
+    document.getElementById('root').innerHTML = `
+    <div class="tb">
+        <div class="tb-brand"><div class="tb-dot"></div>EduKiosk PROF</div>
+        <button class="btn bo" style="color:#fff;border-color:#fff" onclick="showLogin()">Déconnexion</button>
+    </div>
+    <div class="layout">
+        <div class="sidebar">
+            <button class="si on" onclick="showTeacherDashboard()">Vue d'ensemble</button>
+            <button class="si" onclick="alert('Module de création de tests disponible')">Tests</button>
+            <button class="si" onclick="alert('Module documents disponible')">Documents</button>
+        </div>
+        <div class="main">
+            <h1 class="pg">Tableau de bord</h1>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem">
+                <div class="card" style="text-align:center"><h3>${tests.length}</h3><p>Tests</p></div>
+                <div class="card" style="text-align:center"><h3>${results.length}</h3><p>Résultats</p></div>
+                <div class="card" style="text-align:center"><h3>OK</h3><p>Statut Cloud</p></div>
             </div>
-        `;
-        
-        // Tentative de plein écran (si supporté)
-        try { document.documentElement.requestFullscreen(); } catch(e) {}
-    }
+            
+            <h2 class="pg">Derniers Résultats</h2>
+            <div class="tbl">
+                <table>
+                    <thead><tr><th>Date</th><th>Élève</th><th>Classe</th><th>Score</th></tr></thead>
+                    <tbody id="res-body">
+                        ${results.length ? '' : '<tr><td colspan="4" style="text-align:center;color:var(--mt)">Aucun résultat enregistré</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>`;
+}
 
-    // Sécurité stockage : on vide si c'est corrompu
-    try {
-        localStorage.setItem('test', '1');
-        localStorage.removeItem('test');
-    } catch(e) {
-        alert("Stockage saturé ou Navigation Privée détectée. EduKiosk risque de mal fonctionner.");
-    }
+/* --- BOOT --- */
+window.onload = function(){
+    // Initialisation forcée
+    if(!localStorage.getItem(K.p)) SS(K.p, 'PROF2024');
+    showLogin();
+};
 </script>
 </body>
 </html>
