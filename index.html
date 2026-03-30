@@ -438,6 +438,55 @@ function calcScore(questions,answers){
   return{score:Math.round(total*10)/10,max:questions.length,pct:Math.round((total/questions.length)*100),manual:manual};
 }
 
+/* VERROU INSTANTANÉ — affiché immédiatement quand l'app revient au premier plan */
+var _kioskLockOverlay=null;
+
+function showInstantLock(){
+  if(_kioskLockOverlay)return;
+  _kioskLockOverlay=document.createElement('div');
+  _kioskLockOverlay.style.cssText='position:fixed;inset:0;background:#06061a;z-index:99998;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;color:#fff;padding:2rem;text-align:center;';
+  _kioskLockOverlay.innerHTML='<div style="font-size:3.5rem">&#128274;</div>'
+    +'<div style="font-size:1.8rem;font-weight:800;color:#ff6b6b">SESSION VERROUILLEE</div>'
+    +'<div style="color:rgba(255,255,255,.6);font-size:.9rem">Navigation detectee.</div>'
+    +'<div style="background:rgba(255,80,80,.18);border:1px solid rgba(255,80,80,.35);padding:5px 15px;border-radius:20px;font-size:.8rem;color:#ff9090" id="il-infr"></div>'
+    +'<div style="display:flex;flex-direction:column;align-items:center;gap:9px;width:100%;max-width:280px;margin-top:.5rem">'
+      +'<input type="password" id="il-pin" maxlength="30" placeholder="Code PIN professeur" autocomplete="new-password" style="text-align:center;letter-spacing:4px;font-size:1.1rem;background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;padding:12px;width:100%;outline:none;">'
+      +'<div id="il-err" style="color:#ff8080;font-size:.8rem;display:none">Code incorrect</div>'
+      +'<button id="il-ok" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--gd);color:var(--nv);font-weight:700;font-size:.95rem;cursor:pointer;">Deverrouiller</button>'
+      +'<button id="il-abort" style="background:transparent;border:none;color:rgba(255,255,255,.3);font-size:.76rem;cursor:pointer;margin-top:4px;">Abandonner la session</button>'
+    +'</div>';
+  document.body.appendChild(_kioskLockOverlay);
+
+  var infDiv=document.getElementById('il-infr');
+  if(infDiv)infDiv.textContent='⚠ '+_infractions+' infraction(s)';
+
+  function tryPin(){
+    var pin=document.getElementById('il-pin');if(!pin)return;
+    if(checkPin(pin.value,SL(K.p,'PROF2024'))){
+      _kioskLockOverlay.remove();_kioskLockOverlay=null;
+      reFS();
+    }else{
+      var er=document.getElementById('il-err');
+      if(er){er.style.display='';setTimeout(function(){er.style.display='none';},1700);}
+      pin.value='';
+    }
+  }
+  var ok=document.getElementById('il-ok');if(ok)ok.onclick=tryPin;
+  var pin=document.getElementById('il-pin');if(pin)pin.onkeydown=function(e){if(e.key==='Enter')tryPin();e.stopPropagation();};
+  var ab=document.getElementById('il-abort');if(ab)ab.onclick=function(){
+    // Enregistrer l'abandon
+    var ks=SL(K.k,null);
+    if(ks&&ks.student){
+      var result={type:ks.type,studentName:ks.student.name,classe:ks.student.classe,date:new Date().toLocaleDateString('fr-FR'),infractions:_infractions,abandoned:true,testTitle:ks.type==='exam'?(ks.payload.title||''):'',docTitle:ks.type==='doc'?(ks.payload.title||''):'',subject:ks.payload.subject||'',pct:null,score:null,max:null};
+      var all=[].concat(SL(K.r,[]));all.push(result);SS(K.r,all);
+      cloudPost('saveResult',result);
+    }
+    SS(K.k,null);stopAC();_kioskLockOverlay.remove();_kioskLockOverlay=null;showLogin();
+  };
+  setTimeout(function(){var p=document.getElementById('il-pin');if(p)p.focus();},300);
+}
+
+/* Surveiller la visibilité — verrouiller IMMÉDIATEMENT quand l'app revient au premier plan */
 /* ANTI-CHEAT */
 var _acActive=false,_onLock=null,_onSS=null,_infractions=0,_tx=0,_ty=0,_hidAt=0,_sst=null;
 
@@ -495,6 +544,15 @@ function stopAC(){
 }
 
 function reFS(){var el=document.documentElement;(el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el);}
+
+/* Verrouiller INSTANTANÉMENT quand l'app revient au premier plan pendant une session kiosk */
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden&&SL(K.k,null)&&!_kioskLockOverlay){
+    _infractions++;
+    var ks=SL(K.k,null);if(ks){ks.infractions=_infractions;SS(K.k,ks);}
+    showInstantLock();
+  }
+});
 
 /* DOM */
 var ROOT=document.getElementById('root');
