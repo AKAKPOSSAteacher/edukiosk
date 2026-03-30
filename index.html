@@ -2,7 +2,12 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EduKiosk">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f2044">
 <title>EduKiosk</title>
 <style>
 :root{--nv:#0f2044;--nv2:#1a3260;--gd:#e8a120;--gd2:#f5c85a;--cr:#f5f4f0;--sf:#fff;--bd:#e0dbd2;--tx:#1a1a2e;--mt:#6b6880;--rd:#c0392b;--gn:#1e8449;--pu:#7c3aed;--r:12px;--sh:0 2px 12px rgba(15,32,68,.08);}
@@ -1296,6 +1301,16 @@ function showStudentHome(user){
 
 /* BOOT */
 (function(){
+  // Bannière "Ajouter à l'écran d'accueil" sur iOS si pas encore en mode standalone
+  var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent||navigator.platform||'');
+  var isStandalone=window.navigator.standalone===true;
+  if(isIOS&&!isStandalone){
+    var banner=document.createElement('div');
+    banner.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#0f2044;color:#fff;padding:14px 16px;z-index:99999;display:flex;align-items:center;gap:12px;font-size:.85rem;box-shadow:0 -4px 20px rgba(0,0,0,.3);';
+    banner.innerHTML='<span style="font-size:1.6rem">📲</span><div style="flex:1"><div style="font-weight:700;margin-bottom:2px">Mode examen — Installation requise</div><div style="opacity:.8;font-size:.78rem">Appuyez sur <strong>&#9633; Partager</strong> → <strong>Sur l\'écran d\'accueil</strong> pour bloquer les onglets</div></div><button onclick="this.parentNode.remove()" style="background:rgba(255,255,255,.15);border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.78rem;flex-shrink:0">✕ Plus tard</button>';
+    document.body.appendChild(banner);
+  }
+
   var p=urlPayload();
   if(p&&p.data){showIdForm(p.data,p.type,function(student){runKiosk(p.data,p.type,student);});}
   else{showLogin();}
