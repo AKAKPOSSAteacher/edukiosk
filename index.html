@@ -1053,37 +1053,88 @@ function showTeacher(){
       active:true,
       data:type==='doc'?Object.assign({},item,{exitPin:exitPin}):item
     };
-    saveSession(sess);
-    bNav();bMain(); // rafraîchir pour montrer session active
+
+    // Sauvegarder localement immédiatement
+    var sessions=SL(K.s,{});
+    sessions[sess.code]=sess;
+    SS(K.s,sessions);
 
     var old=document.getElementById('sess-modal-bg');if(old)old.remove();
     var bg=document.createElement('div');bg.className='mbg';bg.id='sess-modal-bg';
     bg.innerHTML='<div class="modal" style="max-width:460px;text-align:center">'
       +'<div style="font-size:.85rem;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem">'+(type==='exam'?'Test':'Document')+'</div>'
       +'<div style="font-weight:800;font-size:1.1rem;color:var(--nv);margin-bottom:1.5rem">'+item.title+'</div>'
-      +'<div style="background:var(--nv);border-radius:14px;padding:1.75rem;margin-bottom:1.25rem">'
-        +'<div style="font-size:.72rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem">Code d\'activite — Affichez au tableau</div>'
-        +'<div style="font-size:3.5rem;font-weight:800;color:var(--gd);letter-spacing:12px;font-family:monospace">'+code+'</div>'
-        +(type==='doc'?'<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.15)">'
-          +'<div style="font-size:.72rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem">Code de sortie (fin de consultation)</div>'
-          +'<div style="font-size:2rem;font-weight:800;color:var(--gd2,#f5c85a);letter-spacing:8px;font-family:monospace">'+exitPin+'</div>'
-        +'</div>':'')
+      +'<div id="sess-saving" style="padding:2rem;color:var(--mt);font-size:.9rem">&#8635; Enregistrement en cours...</div>'
+      +'<div id="sess-code-area" style="display:none">'
+        +'<div style="background:var(--nv);border-radius:14px;padding:1.75rem;margin-bottom:1.25rem">'
+          +'<div style="font-size:.72rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem">Code d\'activite — Affichez au tableau</div>'
+          +'<div style="font-size:3.5rem;font-weight:800;color:var(--gd);letter-spacing:12px;font-family:monospace">'+code+'</div>'
+          +(type==='doc'?'<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.15)">'
+            +'<div style="font-size:.72rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem">Code de sortie (fin de consultation)</div>'
+            +'<div style="font-size:2rem;font-weight:800;color:var(--gd);letter-spacing:8px;font-family:monospace">'+exitPin+'</div>'
+          +'</div>':'')
+        +'</div>'
+        +'<div class="mok" style="margin-bottom:1.25rem;text-align:left">&#10003; Session enregistree — Les eleves peuvent saisir ce code.</div>'
+        +'<div style="display:flex;gap:10px">'
+          +'<button class="btn br" style="flex:1" id="sess-stop">&#9632; Arreter la session</button>'
+          +'<button class="btn bo" style="flex:1" id="sess-close">Fermer</button>'
+        +'</div>'
       +'</div>'
-      +'<div class="minfo" style="margin-bottom:1.25rem;text-align:left">Les eleves ouvrent EduKiosk, saisissent leur nom, leur classe et ce code a 6 chiffres pour demarrer.</div>'
-      +'<div style="display:flex;gap:10px">'
-        +'<button class="btn br" style="flex:1" id="sess-stop">&#9632; Arreter la session</button>'
-        +'<button class="btn bo" style="flex:1" id="sess-close">Fermer</button>'
-      +'</div>'
+      +'<div id="sess-err" style="display:none"></div>'
     +'</div>';
     document.body.appendChild(bg);
+
+    // Envoyer au cloud et attendre confirmation
+    function trySave(attempt){
+      fetch(API_URL,{
+        method:'POST',
+        headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'saveSession',data:sess})
+      })
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var saving=document.getElementById('sess-saving');
+        var area=document.getElementById('sess-code-area');
+        if(d&&d.ok){
+          if(saving)saving.style.display='none';
+          if(area)area.style.display='';
+          bNav();bMain();
+        }else{
+          throw new Error(d.error||'Erreur inconnue');
+        }
+      })
+      .catch(function(e){
+        if(attempt<3){
+          setTimeout(function(){trySave(attempt+1);},1500);
+        }else{
+          // Afficher quand même le code (session sauvée localement)
+          var saving=document.getElementById('sess-saving');
+          var area=document.getElementById('sess-code-area');
+          var errDiv=document.getElementById('sess-err');
+          if(saving)saving.style.display='none';
+          if(area)area.style.display='';
+          if(errDiv){errDiv.className='mwarn';errDiv.innerHTML='&#9888; Session non synchronisee avec le cloud. Le code fonctionne sur cet appareil uniquement.';errDiv.style.display='';}
+        }
+      });
+    }
+
+    if(API_URL){trySave(1);}else{
+      var saving=document.getElementById('sess-saving');
+      var area=document.getElementById('sess-code-area');
+      if(saving)saving.style.display='none';
+      if(area)area.style.display='';
+      var errDiv=document.getElementById('sess-err');
+      if(errDiv){errDiv.className='mwarn';errDiv.innerHTML='&#9888; Pas de connexion cloud. Le code fonctionne sur cet appareil uniquement.';errDiv.style.display='';}
+    }
+
     bg.querySelector('#sess-close').onclick=function(){bg.remove();};
-    bg.querySelector('#sess-stop').onclick=function(){
-      deactivateSession(code);
-      bg.remove();
-      bNav();bMain();
-      showToast('Session '+code+' arretee.');
-    };
     bg.onclick=function(e){if(e.target===bg)bg.remove();};
+    // sess-stop sera ajouté après affichage
+    bg.addEventListener('click',function(e){
+      if(e.target&&e.target.id==='sess-stop'){
+        deactivateSession(code);bg.remove();bNav();bMain();showToast('Session '+code+' arretee.');
+      }
+    });
   }
 
   function bTestList(mn){
