@@ -1272,15 +1272,24 @@ function showTeacher(){
 
     function loadLive(){
       if(!API_URL)return;
+      var st=document.getElementById('live-status');
+      if(st)st.textContent='● Actualisation...';
       var cbName='_ek_live_'+Date.now();
+      var done=false;
       var s=document.createElement('script');
       window[cbName]=function(data){
+        done=true;
         delete window[cbName];
         if(s&&s.parentNode)s.parentNode.removeChild(s);
+        if(st)st.textContent='● Actualise '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
         var div=document.getElementById('live-content');
         if(!div)return;
-        if(!data||!data.ok||!data.infractions||!data.infractions.length){
-          div.innerHTML='<div class="card" style="background:#eafaf1;border-color:#a9dfbf;text-align:center;color:var(--gn);font-weight:600">✓ Aucune infraction en cours</div>';
+        if(!data||!data.ok){
+          div.innerHTML='<div class="card merr">Erreur de connexion. Verifiez le Apps Script.</div>';
+          return;
+        }
+        if(!data.infractions||!data.infractions.length){
+          div.innerHTML='<div class="card" style="background:#eafaf1;border-color:#a9dfbf;text-align:center;color:var(--gn);font-weight:600;padding:1.5rem">✓ Aucune infraction en cours</div>';
           return;
         }
         var html='<div class="tbl"><table><thead><tr><th>Eleve</th><th>Classe</th><th>Activite</th><th>Infractions</th><th>Heure</th></tr></thead><tbody>';
@@ -1297,6 +1306,19 @@ function showTeacher(){
         html+='</tbody></table></div>';
         div.innerHTML=html;
       };
+      s.onerror=function(){
+        done=true;
+        var div=document.getElementById('live-content');
+        if(div)div.innerHTML='<div class="card merr">Connexion impossible au Apps Script.</div>';
+        if(st)st.textContent='● Erreur';
+      };
+      setTimeout(function(){
+        if(!done){
+          done=true;
+          var div=document.getElementById('live-content');
+          if(div)div.innerHTML='<div class="card mwarn">Delai depasse — Apps Script lent ou non deploye.</div>';
+        }
+      },10000);
       s.src=API_URL+'?action=getLiveInfractions&callback='+cbName+'&t='+Date.now();
       document.head.appendChild(s);
     }
