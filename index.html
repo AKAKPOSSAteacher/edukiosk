@@ -489,6 +489,8 @@ function showInstantLock(){
     var pin=document.getElementById('il-pin');if(!pin)return;
     if(checkPin(pin.value,SL(K.p,'PROF2024'))){
       _kioskLockOverlay.remove();_kioskLockOverlay=null;
+      // Fermer aussi le verrou interne s'il est visible
+      var lk=document.getElementById('lock');if(lk)lk.style.display='none';
       reFS();
     }else{
       var er=document.getElementById('il-err');
@@ -515,7 +517,20 @@ function showInstantLock(){
 /* ANTI-CHEAT */
 var _acActive=false,_onLock=null,_onSS=null,_infractions=0,_tx=0,_ty=0,_hidAt=0,_sst=null;
 
-function _lock(){if(_acActive&&_onLock){_infractions++;_onLock(_infractions);}}
+function _lock(){
+  if(!_acActive)return;
+  _infractions++;
+  // Mettre à jour l'état kiosk sauvegardé
+  var ks=SL(K.k,null);if(ks){ks.infractions=_infractions;SS(K.k,ks);}
+  // Si l'overlay instantané est déjà visible, juste mettre à jour le compteur
+  if(_kioskLockOverlay){
+    var infDiv=document.getElementById('il-infr');
+    if(infDiv)infDiv.textContent='⚠ '+_infractions+' infraction(s)';
+    return;
+  }
+  // Sinon utiliser le verrou interne de la session
+  if(_onLock)_onLock(_infractions);
+}
 function _ss(){if(_acActive&&_onSS){_infractions++;_onSS(_infractions);}}
 
 var _h={
@@ -538,12 +553,12 @@ function startAC(onLock,onSS,docMode){
   _acActive=true;_infractions=0;_onLock=onLock;_onSS=onSS;
   document.body.classList.add('kiosk');
   var el=document.documentElement;
-  (el.requestFullscreen||el.webkitRequestFullscreen||function(){}). call(el);
+  (el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el);
+  // fullscreenchange → si pas d'overlay instantané déjà visible, déclencher le verrou interne
   document.addEventListener('fullscreenchange',_h.fs);
   document.addEventListener('webkitfullscreenchange',_h.fs);
   document.addEventListener('visibilitychange',_h.vis);
   document.addEventListener('visibilitychange',_h.ssv);
-  // En mode document, le blur vient de l'iframe (interaction normale) — on ne verrouille pas sur blur
   if(!docMode) window.addEventListener('blur',_h.blur);
   document.addEventListener('keydown',_h.key,{capture:true,passive:false});
   document.addEventListener('contextmenu',_h.rc);
@@ -573,6 +588,9 @@ function reFS(){var el=document.documentElement;(el.requestFullscreen||el.webkit
 /* Verrouiller INSTANTANÉMENT quand l'app revient au premier plan pendant une session kiosk */
 document.addEventListener('visibilitychange',function(){
   if(!document.hidden&&SL(K.k,null)&&!_kioskLockOverlay){
+    // Vérifier si le verrou interne est déjà affiché
+    var lk=document.getElementById('lock');
+    if(lk&&lk.style.display==='flex')return;
     _infractions++;
     var ks=SL(K.k,null);if(ks){ks.infractions=_infractions;SS(K.k,ks);}
     showInstantLock();
