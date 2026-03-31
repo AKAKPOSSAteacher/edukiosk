@@ -537,15 +537,27 @@ function _ss(){if(_acActive&&_onSS){_infractions++;_onSS(_infractions);}}
 var _liveStudent=null;
 
 function _sendLiveInfraction(){
-  if(!API_URL||!_liveStudent)return;
+  if(!API_URL)return;
+  // Récupérer les infos élève — priorité à _liveStudent, sinon depuis l'état kiosk
+  var student=_liveStudent;
+  if(!student){
+    var ks=SL(K.k,null);
+    if(ks&&ks.student)student={
+      name:ks.student.name,
+      classe:ks.student.classe,
+      title:ks.payload?ks.payload.title:'',
+      type:ks.type||'exam'
+    };
+  }
+  if(!student)return;
   var cbName='_ek_li_'+Date.now();
   var done=false;
   window[cbName]=function(){done=true;delete window[cbName];};
   var payload={
-    studentName:_liveStudent.name,
-    classe:_liveStudent.classe,
-    title:_liveStudent.title||'',
-    type:_liveStudent.type||'exam',
+    studentName:student.name,
+    classe:student.classe,
+    title:student.title||'',
+    type:student.type||'exam',
     infractions:_infractions,
     date:new Date().toLocaleDateString('fr-FR')
   };
@@ -1267,6 +1279,7 @@ function showTeacher(){
       +'<div style="display:flex;align-items:center;gap:10px">'
         +'<span id="live-status" style="font-size:.78rem;color:var(--gn)">● Actualisation auto</span>'
         +'<button class="btn bo bsm" id="live-refresh">↻ Actualiser</button>'
+        +'<button class="btn br bsm" id="live-clear">Vider</button>'
       +'</div></div>'
       +'<div id="live-content"><div class="card tc" style="color:var(--mt)">Chargement...</div></div>';
 
@@ -1333,6 +1346,14 @@ function showTeacher(){
 
     var rb=document.getElementById('live-refresh');
     if(rb)rb.onclick=loadLive;
+    var lc=document.getElementById('live-clear');
+    if(lc)lc.onclick=function(){
+      var cbName='_ek_lc_'+Date.now();
+      window[cbName]=function(){delete window[cbName];loadLive();};
+      var s=document.createElement('script');
+      s.src=API_URL+'?action=clearLiveInfractions&callback='+cbName+'&t='+Date.now();
+      document.head.appendChild(s);
+    };
   }
 
   function showSessionModal(type, item){
