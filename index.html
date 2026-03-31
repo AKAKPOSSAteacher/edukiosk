@@ -769,7 +769,7 @@ function showLogin(){
   }
 
   // Toujours mettre à jour l'URL avec la dernière version
-  API_URL='https://script.google.com/macros/s/AKfycbztPqh_LSBQym_NshvYFmkZzcqDGCyagoHq2OP8TMabmZ6l__fZdKuPARvVaKAhj6o5/exec';
+  API_URL='https://script.google.com/macros/s/AKfycbydos6n3Vje2nxeLrVb9azPVqSVv58Uzkck4O4XB0ToGYVg0viD5_jPxRqdxGk_P47o/exec';
   SS('ek_api',API_URL);
   cloudGet(function(){MASTER=SL('ek_master','****');});
 }
@@ -1149,7 +1149,7 @@ function showTeacher(){
 
   // Stocker l'URL API si pas encore fait
   // Toujours mettre à jour l'URL avec la dernière version
-  SS('ek_api','https://script.google.com/macros/s/AKfycbztPqh_LSBQym_NshvYFmkZzcqDGCyagoHq2OP8TMabmZ6l__fZdKuPARvVaKAhj6o5/exec');
+  SS('ek_api','https://script.google.com/macros/s/AKfycbydos6n3Vje2nxeLrVb9azPVqSVv58Uzkck4O4XB0ToGYVg0viD5_jPxRqdxGk_P47o/exec');
   API_URL=SL('ek_api','');
 
   render('<div id="tb" class="tb"><div class="tb-brand"><div class="tb-dot"></div>EduKiosk <span class="bdg b-gd" style="margin-left:8px">PROF</span></div><div class="tb-right"><span id="sync-status" style="font-size:.75rem;opacity:.8;margin-right:4px"></span><button class="tb-btn" id="tb-sync">&#8635; Sync</button><button class="tb-btn" id="tl">Deconnexion</button></div></div><div class="layout"><div class="sidebar" id="tnav"></div><div class="main" id="tmain"></div></div>');
