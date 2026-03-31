@@ -640,15 +640,7 @@ function showLogin(){
     +'</div></div>'
   );
 
-  // Geste secret : 5 clics sur le logo → accès professeur
-  var tapCount=0,tapTimer=null;
-  var logo=g('#ek-logo');
-  if(logo)logo.onclick=function(){
-    tapCount++;
-    clearTimeout(tapTimer);
-    if(tapCount>=5){tapCount=0;showProfLogin();}
-    else{tapTimer=setTimeout(function(){tapCount=0;},2000);}
-  };
+  // Geste secret supprimé — accès prof uniquement via URL #prof
 
   function goStudent(){
     var name=v('#inp-name').trim();
@@ -770,12 +762,15 @@ function showProfLogin(){
   );
   function go(){
     var err=g('#perr');err.style.display='none';
-    if(checkPin(v('#inp-pw'),SL(K.p,'PROF2024'))){showTeacher();}
+    if(checkPin(v('#inp-pw'),SL(K.p,'PROF2024'))){
+      history.replaceState(null,'',location.pathname); // effacer #prof de l'URL
+      showTeacher();
+    }
     else{err.className='merr';err.textContent='Code PIN incorrect.';err.style.display='';}
   }
   g('#btn-pw').onclick=go;
   var pw=g('#inp-pw');if(pw)pw.onkeydown=function(e){if(e.key==='Enter')go();};
-  g('#btn-back').onclick=showLogin;
+  g('#btn-back').onclick=function(){history.replaceState(null,'',location.pathname);showLogin();};
 }
 
 /* ID FORM */
@@ -1855,6 +1850,7 @@ function showStudentHome(user){
 
   var p=urlPayload();
   if(p&&p.data){showIdForm(p.data,p.type,function(student){runKiosk(p.data,p.type,student);});}
+  else if(location.hash==='#prof'){showProfLogin();}
   else{showLogin();}
 })();
 </script></body></html>
