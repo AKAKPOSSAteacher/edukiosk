@@ -533,21 +533,25 @@ function _lock(){
 }
 function _ss(){if(_acActive&&_onSS){_infractions++;_onSS(_infractions);}}
 
+/* Stocker les infos élève actif séparément pour les infractions live */
+var _liveStudent=null;
+
 function _sendLiveInfraction(){
-  if(!API_URL)return;
-  var ks=SL(K.k,null);if(!ks||!ks.student)return;
+  if(!API_URL||!_liveStudent)return;
   var cbName='_ek_li_'+Date.now();
-  window[cbName]=function(){delete window[cbName];};
-  var data=encodeURIComponent(JSON.stringify({
-    studentName:ks.student.name,
-    classe:ks.student.classe,
-    title:ks.payload?ks.payload.title:'',
-    type:ks.type||'exam',
+  var done=false;
+  window[cbName]=function(){done=true;delete window[cbName];};
+  var payload={
+    studentName:_liveStudent.name,
+    classe:_liveStudent.classe,
+    title:_liveStudent.title||'',
+    type:_liveStudent.type||'exam',
     infractions:_infractions,
     date:new Date().toLocaleDateString('fr-FR')
-  }));
+  };
   var s=document.createElement('script');
-  s.src=API_URL+'?action=liveInfraction&data='+data+'&callback='+cbName+'&t='+Date.now();
+  s.src=API_URL+'?action=liveInfraction&data='+encodeURIComponent(JSON.stringify(payload))+'&callback='+cbName+'&t='+Date.now();
+  s.onerror=function(){if(!done)delete window[cbName];};
   document.head.appendChild(s);
 }
 
@@ -621,11 +625,15 @@ function reFS(){var el=document.documentElement;(el.requestFullscreen||el.webkit
 /* Verrouiller INSTANTANÉMENT quand l'app revient au premier plan pendant une session kiosk */
 document.addEventListener('visibilitychange',function(){
   if(!document.hidden&&SL(K.k,null)&&!_kioskLockOverlay){
-    // Vérifier si le verrou interne est déjà affiché
     var lk=document.getElementById('lock');
     if(lk&&lk.style.display==='flex')return;
     _infractions++;
-    var ks=SL(K.k,null);if(ks){ks.infractions=_infractions;SS(K.k,ks);}
+    var ks=SL(K.k,null);
+    if(ks){
+      ks.infractions=_infractions;SS(K.k,ks);
+      if(!_liveStudent&&ks.student)_liveStudent={name:ks.student.name,classe:ks.student.classe,title:ks.payload?ks.payload.title:'',type:ks.type||'exam'};
+    }
+    _sendLiveInfraction();
     showInstantLock();
   }
 });
@@ -807,6 +815,7 @@ function showIdForm(payload,type,onStart){
 function runKiosk(payload,type,student){
   // Sauvegarder l'état kiosk — restauré si l'app se ferme sur iOS
   SS(K.k,{payload:payload,type:type,student:student,infractions:0,t0:Date.now()});
+  _liveStudent={name:student.name,classe:student.classe,title:payload.title||'',type:type};
   requestWakeLock();
 
   render('<div style="min-height:100vh;background:var(--cr);display:flex;flex-direction:column"><div id="ac"></div><div id="ssov" style="display:none;flex-direction:column"><div style="font-size:2.5rem">&#128247;</div><div style="font-size:1.4rem;font-weight:800;color:#ff6b6b">CAPTURE DETECTEE</div><div style="opacity:.65;font-size:.9rem">Infraction enregistree.</div></div><div id="lock" style="display:none;flex-direction:column"><div class="l-icon">&#128274;</div><div class="l-title">SESSION VERROUILLEE</div><div class="l-sub">Tentative de navigation detectee.</div><div class="infr" id="l-infr"></div><div class="l-form"><input class="l-inp" type="password" id="l-pin" maxlength="30" placeholder="Code PIN professeur" autocomplete="new-password"><div id="l-err" style="color:#ff8080;font-size:.8rem;display:none">Code incorrect</div><button class="btn bg bfull" id="l-ok">Deverrouiller</button><button class="btn bfull" style="background:transparent;border:none;color:rgba(255,255,255,.3);font-size:.76rem" id="l-abort">Abandonner</button></div></div><div id="deov" style="display:none"></div><div id="kbody" style="flex:1;padding:1.5rem;overflow-y:auto"></div></div>');
@@ -858,6 +867,7 @@ function runKiosk(payload,type,student){
   function finish(result){
     stopAC();
     releaseWakeLock();
+    _liveStudent=null;
     SS(K.k,null); // effacer l'état kiosk
     if(result){
       var all=[].concat(SL(K.r,[]));all.push(result);SS(K.r,all);
