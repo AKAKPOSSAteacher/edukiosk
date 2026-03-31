@@ -252,6 +252,7 @@ function cloudGet(onDone){
           SS(K.r,data.results);
         }
         if(data.pin&&data.pin!=='PROF2024'){SS(K.p,data.pin);}
+        if(data.master){SS('ek_master',data.master);MASTER=data.master;}
         syncStatus('Synchronise \u2713',true);
         onDone&&onDone(data);
       }else{
@@ -1764,6 +1765,7 @@ function showTeacher(){
         if(msg){msg.className='merr';msg.textContent='4 caracteres minimum.';msg.style.display='';}
       }else{
         SS('ek_master',nv);MASTER=nv;
+        cloudPost('saveMaster',nv);
         if(msg){msg.className='mok';msg.style.color='#7a5c00';msg.textContent='Code de secours mis a jour !';msg.style.display='';setTimeout(function(){msg.style.display='none';},3000);}
       }
     };
