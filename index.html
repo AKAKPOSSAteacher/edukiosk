@@ -1765,7 +1765,12 @@ function showTeacher(){
         if(msg){msg.className='merr';msg.textContent='4 caracteres minimum.';msg.style.display='';}
       }else{
         SS('ek_master',nv);MASTER=nv;
-        cloudPost('saveMaster',nv);
+        // Envoyer via JSONP GET (contourne CORS)
+        var cbName='_ek_sm_'+Date.now();
+        window[cbName]=function(){delete window[cbName];};
+        var s=document.createElement('script');
+        s.src=API_URL+'?action=saveMaster&data='+encodeURIComponent(nv)+'&callback='+cbName+'&t='+Date.now();
+        document.head.appendChild(s);
         if(msg){msg.className='mok';msg.style.color='#7a5c00';msg.textContent='Code de secours mis a jour !';msg.style.display='';setTimeout(function(){msg.style.display='none';},3000);}
       }
     };
