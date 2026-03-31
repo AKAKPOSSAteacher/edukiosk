@@ -524,7 +524,7 @@ var _h={
   ssv:function(){if(document.hidden){_hidAt=Date.now();}else{if(_hidAt&&Date.now()-_hidAt<1500)_ss();_hidAt=0;}},
   blur:function(){_lock();},
   key:function(e){
-    if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();return;}
+    if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();_lock();return;}
     if(e.key==='PrintScreen'||(e.metaKey&&e.shiftKey&&'345'.indexOf(e.key)>=0)||(e.ctrlKey&&e.shiftKey&&e.key==='S')){e.preventDefault();e.stopImmediatePropagation();_ss();return;}
     if((e.altKey&&e.key==='Tab')||(e.ctrlKey&&'wtl'.indexOf(e.key.toLowerCase())>=0)||e.key==='F12'||(e.metaKey&&'wq'.indexOf(e.key)>=0)){e.preventDefault();e.stopImmediatePropagation();_lock();}
   },
@@ -954,8 +954,10 @@ function runDoc(container,doc,student,exitOv,onClose){
     if(pin){pin.value='';setTimeout(function(){pin.value='';pin.focus();},200);}
     function tryEx(){
       var lpin=exitOv.querySelector('#ep');if(!lpin)return;
-      if(checkPin(lpin.value,doc.exitPin)){exitOv.style.display='none';var dur=Math.round((Date.now()-t0)/1000);onClose({type:'doc',docTitle:doc.title,subject:doc.subject,studentName:student.name,classe:student.classe,date:new Date().toLocaleDateString('fr-FR'),duration:dur,infractions:_infractions});}
-      else{var ee=exitOv.querySelector('#ee');if(ee){ee.style.display='';setTimeout(function(){ee.style.display='none';},1800);}if(lpin)lpin.value='';}
+      // Accepter : code de sortie session, PIN prof, ou code maître
+      if(checkPin(lpin.value,doc.exitPin)||checkPin(lpin.value,SL(K.p,'PROF2024'))){
+        exitOv.style.display='none';var dur=Math.round((Date.now()-t0)/1000);onClose({type:'doc',docTitle:doc.title,subject:doc.subject,studentName:student.name,classe:student.classe,date:new Date().toLocaleDateString('fr-FR'),duration:dur,infractions:_infractions});
+      }else{var ee=exitOv.querySelector('#ee');if(ee){ee.style.display='';setTimeout(function(){ee.style.display='none';},1800);}if(lpin)lpin.value='';}
     }
     var eok=exitOv.querySelector('#eok');if(eok)eok.onclick=tryEx;
     var ecan=exitOv.querySelector('#ecan');if(ecan)ecan.onclick=function(){exitOv.style.display='none';};
