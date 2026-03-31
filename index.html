@@ -538,7 +538,6 @@ var _liveStudent=null;
 
 function _sendLiveInfraction(){
   if(!API_URL)return;
-  // Récupérer les infos élève — priorité à _liveStudent, sinon depuis l'état kiosk
   var student=_liveStudent;
   if(!student){
     var ks=SL(K.k,null);
@@ -550,9 +549,6 @@ function _sendLiveInfraction(){
     };
   }
   if(!student)return;
-  var cbName='_ek_li_'+Date.now();
-  var done=false;
-  window[cbName]=function(){done=true;delete window[cbName];};
   var payload={
     studentName:student.name,
     classe:student.classe,
@@ -561,10 +557,8 @@ function _sendLiveInfraction(){
     infractions:_infractions,
     date:new Date().toLocaleDateString('fr-FR')
   };
-  var s=document.createElement('script');
-  s.src=API_URL+'?action=liveInfraction&data='+encodeURIComponent(JSON.stringify(payload))+'&callback='+cbName+'&t='+Date.now();
-  s.onerror=function(){if(!done)delete window[cbName];};
-  document.head.appendChild(s);
+  // Utiliser Image() — méthode la plus fiable, fonctionne même en kiosk
+  new Image().src=API_URL+'?action=liveInfraction&data='+encodeURIComponent(JSON.stringify(payload))+'&t='+Date.now();
 }
 
 var _h={
