@@ -158,7 +158,7 @@ function saveSession(sess){
 
 function saveSessionToCloud(sess, onDone){
   if(!API_URL)return onDone&&onDone(false);
-  // Stocker uniquement les métadonnées (pas le test complet) pour rester sous la limite URL
+  // Stocker les métadonnées + contenu pour les docs texte (pas volumineux)
   var meta={
     code:sess.code,
     type:sess.type,
@@ -169,6 +169,10 @@ function saveSessionToCloud(sess, onDone){
     created:sess.created,
     active:sess.active
   };
+  // Pour les documents texte, inclure le contenu directement (sinon l'élève ne peut pas l'afficher)
+  if(sess.type==='doc'&&sess.data&&sess.data.docType==='text'){
+    meta.data=sess.data;
+  }
   // Utiliser JSONP (GET) — pas de problème CORS, fonctionne partout
   var cbName='_ek_save_'+Date.now();
   var done=false;
@@ -641,7 +645,7 @@ function showLogin(){
       btn.disabled=false;if(loading)loading.style.display='none';
       if(data&&data.ok&&data.session&&data.session.active){
         var sess=data.session;
-        // Si session sans données complètes (metadata only), récupérer localement
+        // Si la session contient déjà les données complètes, les utiliser directement
         if(!sess.data&&sess.activityId){
           var localTests=SL(K.t,[]);
           var localDocs=SL(K.d,[]);
@@ -653,8 +657,11 @@ function showLogin(){
             if(d2)sess.data=Object.assign({},d2,{exitPin:sess.exitPin});
           }
         }
+        // S'assurer que exitPin est bien dans les données du doc
+        if(sess.data&&sess.type==='doc'&&!sess.data.exitPin){
+          sess.data=Object.assign({},sess.data,{exitPin:sess.exitPin});
+        }
         if(!sess.data){
-          // Déclencher une sync puis réessayer
           showErr('Activite introuvable. Synchronisez EduKiosk en vous connectant en professeur sur cet appareil.');
           return;
         }
