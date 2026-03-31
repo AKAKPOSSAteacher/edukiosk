@@ -521,18 +521,35 @@ var _acActive=false,_onLock=null,_onSS=null,_infractions=0,_tx=0,_ty=0,_hidAt=0,
 function _lock(){
   if(!_acActive)return;
   _infractions++;
-  // Mettre à jour l'état kiosk sauvegardé
   var ks=SL(K.k,null);if(ks){ks.infractions=_infractions;SS(K.k,ks);}
-  // Si l'overlay instantané est déjà visible, juste mettre à jour le compteur
+  // Envoyer l'infraction en temps réel vers Sheets
+  _sendLiveInfraction();
   if(_kioskLockOverlay){
     var infDiv=document.getElementById('il-infr');
     if(infDiv)infDiv.textContent='⚠ '+_infractions+' infraction(s)';
     return;
   }
-  // Sinon utiliser le verrou interne de la session
   if(_onLock)_onLock(_infractions);
 }
 function _ss(){if(_acActive&&_onSS){_infractions++;_onSS(_infractions);}}
+
+function _sendLiveInfraction(){
+  if(!API_URL)return;
+  var ks=SL(K.k,null);if(!ks||!ks.student)return;
+  var cbName='_ek_li_'+Date.now();
+  window[cbName]=function(){delete window[cbName];};
+  var data=encodeURIComponent(JSON.stringify({
+    studentName:ks.student.name,
+    classe:ks.student.classe,
+    title:ks.payload?ks.payload.title:'',
+    type:ks.type||'exam',
+    infractions:_infractions,
+    date:new Date().toLocaleDateString('fr-FR')
+  }));
+  var s=document.createElement('script');
+  s.src=API_URL+'?action=liveInfraction&data='+data+'&callback='+cbName+'&t='+Date.now();
+  document.head.appendChild(s);
+}
 
 var _h={
   fs:function(){
@@ -1133,7 +1150,7 @@ function showTeacher(){
 
   function bNav(){
     var nav=document.getElementById('tnav');if(!nav)return;
-    var items=[{id:'home',l:'Vue ensemble'},{id:'tests',l:'Tests'},{id:'docs',l:'Documents'},{id:'results',l:'Resultats'},{id:'settings',l:'Parametres'}];
+    var items=[{id:'home',l:'Vue ensemble'},{id:'live',l:'🔴 En direct'},{id:'tests',l:'Tests'},{id:'docs',l:'Documents'},{id:'results',l:'Resultats'},{id:'settings',l:'Parametres'}];
     nav.innerHTML=items.map(function(it){return '<button class="si'+(view===it.id&&!creating?' on':'')+'" data-v="'+it.id+'">'+it.l+'</button>';}).join('');
     nav.querySelectorAll('.si').forEach(function(b){b.onclick=function(){view=b.dataset.v;creating=null;bNav();bMain();};});
   }
@@ -1145,6 +1162,7 @@ function showTeacher(){
     else if(view==='tests'){if(creating==='test')bTestCreator(mn);else bTestList(mn);}
     else if(view==='docs'){if(creating==='doc')bDocCreator(mn);else bDocList(mn);}
     else if(view==='results')bResults(mn);
+    else if(view==='live')bLive(mn);
     else if(view==='settings')bSettings(mn);
   }
 
@@ -1230,6 +1248,59 @@ function showTeacher(){
     mn.appendChild(iDiv);
 
     if(results.length)mn.appendChild(bResTable([].concat(results).reverse().slice(0,15)));
+  }
+
+  var _liveTimer=null;
+
+  function bLive(mn){
+    mn.innerHTML='<div class="ch mb1"><h1 class="pg" style="margin:0">🔴 Infractions en direct</h1>'
+      +'<div style="display:flex;align-items:center;gap:10px">'
+        +'<span id="live-status" style="font-size:.78rem;color:var(--gn)">● Actualisation auto</span>'
+        +'<button class="btn bo bsm" id="live-refresh">↻ Actualiser</button>'
+      +'</div></div>'
+      +'<div id="live-content"><div class="card tc" style="color:var(--mt)">Chargement...</div></div>';
+
+    function loadLive(){
+      if(!API_URL)return;
+      var cbName='_ek_live_'+Date.now();
+      var s=document.createElement('script');
+      window[cbName]=function(data){
+        delete window[cbName];
+        if(s&&s.parentNode)s.parentNode.removeChild(s);
+        var div=document.getElementById('live-content');
+        if(!div)return;
+        if(!data||!data.ok||!data.infractions||!data.infractions.length){
+          div.innerHTML='<div class="card" style="background:#eafaf1;border-color:#a9dfbf;text-align:center;color:var(--gn);font-weight:600">✓ Aucune infraction en cours</div>';
+          return;
+        }
+        var html='<div class="tbl"><table><thead><tr><th>Eleve</th><th>Classe</th><th>Activite</th><th>Infractions</th><th>Heure</th></tr></thead><tbody>';
+        data.infractions.forEach(function(r){
+          var inf=r.infractions||0;
+          html+='<tr>'
+            +'<td style="font-weight:700">'+r.studentName+'</td>'
+            +'<td>'+r.classe+'</td>'
+            +'<td style="color:var(--mt)">'+r.title+'</td>'
+            +'<td><span style="background:var(--rd);color:#fff;padding:3px 10px;border-radius:20px;font-size:.78rem;font-weight:700">'+inf+' infr.</span></td>'
+            +'<td style="color:var(--mt);font-size:.78rem">'+r.date+'</td>'
+          +'</tr>';
+        });
+        html+='</tbody></table></div>';
+        div.innerHTML=html;
+      };
+      s.src=API_URL+'?action=getLiveInfractions&callback='+cbName+'&t='+Date.now();
+      document.head.appendChild(s);
+    }
+
+    loadLive();
+    // Auto-refresh toutes les 20 secondes
+    clearInterval(_liveTimer);
+    _liveTimer=setInterval(function(){
+      if(view==='live')loadLive();
+      else clearInterval(_liveTimer);
+    },20000);
+
+    var rb=document.getElementById('live-refresh');
+    if(rb)rb.onclick=loadLive;
   }
 
   function showSessionModal(type, item){
