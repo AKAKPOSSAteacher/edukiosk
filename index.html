@@ -548,7 +548,15 @@ function _sendLiveInfraction(){
       type:ks.type||'exam'
     };
   }
-  if(!student)return;
+  if(!student){
+    // Debug : afficher un toast pour confirmer que la fonction est appelée sans student
+    var t=document.createElement('div');
+    t.style.cssText='position:fixed;top:10px;right:10px;background:#c0392b;color:#fff;padding:8px 14px;border-radius:8px;font-size:.8rem;z-index:99999;';
+    t.textContent='LIVE: student null';
+    document.body.appendChild(t);
+    setTimeout(function(){t.remove();},3000);
+    return;
+  }
   var payload={
     studentName:student.name,
     classe:student.classe,
@@ -557,7 +565,6 @@ function _sendLiveInfraction(){
     infractions:_infractions,
     date:new Date().toLocaleDateString('fr-FR')
   };
-  // Utiliser Image() — méthode la plus fiable, fonctionne même en kiosk
   new Image().src=API_URL+'?action=liveInfraction&data='+encodeURIComponent(JSON.stringify(payload))+'&t='+Date.now();
 }
 
