@@ -1305,18 +1305,17 @@ function showTeacher(){
           div.innerHTML='<div class="card" style="background:#eafaf1;border-color:#a9dfbf;text-align:center;color:var(--gn);font-weight:600;padding:1.5rem">✓ Aucune infraction en cours</div>';
           return;
         }
-        var html='<div class="tbl"><table><thead><tr><th>Eleve</th><th>Classe</th><th>Activite</th><th>Infractions</th><th>Heure</th></tr></thead><tbody>';
+        var html='<div style="display:flex;flex-wrap:wrap;gap:10px;padding:.5rem 0">';
         data.infractions.forEach(function(r){
-          var inf=r.infractions||0;
-          html+='<tr>'
-            +'<td style="font-weight:700">'+r.studentName+'</td>'
-            +'<td>'+r.classe+'</td>'
-            +'<td style="color:var(--mt)">'+r.title+'</td>'
-            +'<td><span style="background:var(--rd);color:#fff;padding:3px 10px;border-radius:20px;font-size:.78rem;font-weight:700">'+inf+' infr.</span></td>'
-            +'<td style="color:var(--mt);font-size:.78rem">'+r.date+'</td>'
-          +'</tr>';
+          html+='<div style="background:#fdecea;border:1.5px solid #f5c2be;border-radius:10px;padding:.75rem 1.1rem;display:flex;align-items:center;gap:10px">'
+            +'<span style="font-weight:700;font-size:.97rem;color:var(--rd)">⚠</span>'
+            +'<div>'
+              +'<div style="font-weight:700;font-size:.95rem">'+r.studentName+'</div>'
+              +'<div style="font-size:.78rem;color:var(--mt)">'+r.infractions+' infraction(s)</div>'
+            +'</div>'
+          +'</div>';
         });
-        html+='</tbody></table></div>';
+        html+='</div>';
         div.innerHTML=html;
       };
       s.onerror=function(){
