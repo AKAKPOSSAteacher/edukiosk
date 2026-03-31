@@ -521,11 +521,6 @@ var _acActive=false,_onLock=null,_onSS=null,_infractions=0,_tx=0,_ty=0,_hidAt=0,
 function _lock(){
   if(!_acActive)return;
   _infractions++;
-  // Debug temporaire
-  var t=document.createElement('div');
-  t.style.cssText='position:fixed;top:10px;right:10px;background:#e8a120;color:#0f2044;padding:8px 14px;border-radius:8px;font-size:.8rem;z-index:99999;font-weight:700;';
-  t.textContent='LOCK #'+_infractions+' acActive='+_acActive;
-  document.body.appendChild(t);setTimeout(function(){t.remove();},4000);
   var ks=SL(K.k,null);if(ks){ks.infractions=_infractions;SS(K.k,ks);}
   _sendLiveInfraction();
   if(_kioskLockOverlay){
@@ -552,15 +547,7 @@ function _sendLiveInfraction(){
       type:ks.type||'exam'
     };
   }
-  if(!student){
-    // Debug : afficher un toast pour confirmer que la fonction est appelée sans student
-    var t=document.createElement('div');
-    t.style.cssText='position:fixed;top:10px;right:10px;background:#c0392b;color:#fff;padding:8px 14px;border-radius:8px;font-size:.8rem;z-index:99999;';
-    t.textContent='LIVE: student null';
-    document.body.appendChild(t);
-    setTimeout(function(){t.remove();},3000);
-    return;
-  }
+  if(!student)return;
   var payload={
     studentName:student.name,
     classe:student.classe,
