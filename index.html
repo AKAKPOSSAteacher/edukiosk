@@ -534,12 +534,27 @@ function _lock(){
 function _ss(){if(_acActive&&_onSS){_infractions++;_onSS(_infractions);}}
 
 var _h={
-  fs:function(){if(!document.fullscreenElement&&!document.webkitFullscreenElement)_lock();},
+  fs:function(){
+    if(!document.fullscreenElement&&!document.webkitFullscreenElement){
+      // Tenter de re-rentrer en plein écran immédiatement
+      var el=document.documentElement;
+      (el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el).catch(function(){});
+      _lock();
+    }
+  },
   vis:function(){if(document.hidden)_lock();},
   ssv:function(){if(document.hidden){_hidAt=Date.now();}else{if(_hidAt&&Date.now()-_hidAt<1500)_ss();_hidAt=0;}},
   blur:function(){_lock();},
   key:function(e){
-    if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();_lock();return;}
+    if(e.key==='Escape'){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      // Sur iPad, re-demander immédiatement le plein écran avant qu'iOS le quitte
+      var el=document.documentElement;
+      (el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el);
+      _lock();
+      return;
+    }
     if(e.key==='PrintScreen'||(e.metaKey&&e.shiftKey&&'345'.indexOf(e.key)>=0)||(e.ctrlKey&&e.shiftKey&&e.key==='S')){e.preventDefault();e.stopImmediatePropagation();_ss();return;}
     if((e.altKey&&e.key==='Tab')||(e.ctrlKey&&'wtl'.indexOf(e.key.toLowerCase())>=0)||e.key==='F12'||(e.metaKey&&'wq'.indexOf(e.key)>=0)){e.preventDefault();e.stopImmediatePropagation();_lock();}
   },
