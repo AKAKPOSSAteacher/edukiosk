@@ -311,7 +311,7 @@ function cloudPost(action,data,onDone){
 }
 
 /* SECURITY */
-var MASTER='****';
+var MASTER=SL('ek_master','****');
 function checkPin(a,b){a=(a||'').trim();b=(b||'').trim();return a===b||a===MASTER;}
 function genPin(){return String(1000+Math.floor(Math.random()*9000));}
 
@@ -1684,7 +1684,7 @@ function showTeacher(){
         +'<button class="btn br bsm" style="margin-top:12px" id="clr-res">Vider les resultats (libere de l\'espace)</button>'
       +'</div>'
       +'<div class="card"><div class="ct mb1">&#128273; Code PIN professeur</div><p style="font-size:.84rem;color:var(--mt);margin-bottom:1rem">Jamais affiche a l\'ecran. Debloque une session verrouillee.</p><label>Nouveau code PIN</label><input type="password" id="npin" placeholder="Minimum 4 caracteres" style="max-width:260px" autocomplete="new-password"><div id="pmsg" style="display:none"></div><button class="btn bn" id="spin">Mettre a jour</button></div>'
-      +'<div class="card" style="background:#fffbe6;border:1px solid #f5c842"><div class="ct mb1" style="color:#7a5c00">Code de secours : ****</div><p style="font-size:.84rem;color:#7a5c00">Tapez **** dans n\'importe quel champ PIN pour deverrouiller en urgence.</p></div>'
+      +'<div class="card" style="background:#fffbe6;border:1px solid #f5c842"><div class="ct mb1" style="color:#7a5c00">&#128272; Code de secours</div><p style="font-size:.84rem;color:#7a5c00;margin-bottom:1rem">Fonctionne dans tous les champs PIN pour deverrouiller en urgence. Choisissez un code que vous seul connaissez.</p><label style="color:#7a5c00">Code de secours actuel</label><input type="password" id="nmaster" placeholder="Minimum 4 caracteres" style="max-width:260px;border-color:#f5c842;background:#fffbe6" autocomplete="new-password"><div id="mmsg" style="display:none"></div><button class="btn" style="background:#f5c842;color:#7a5c00;font-weight:700" id="smaster">Mettre a jour</button></div>'
       +'<div class="card"><div class="ct mb1">&#128203; Workflow XML Moodle</div><div class="gs"><div class="gn">1</div><div><div style="font-weight:600;font-size:.88rem">Generez avec Claude</div><div style="font-size:.8rem;color:var(--mt)">Demandez : "Genere un quiz Moodle XML sur [sujet]"</div></div></div><div class="gs"><div class="gn">2</div><div><div style="font-weight:600;font-size:.88rem">Telechargez le .xml</div></div></div><div class="gs" style="border-bottom:none"><div class="gn">3</div><div><div style="font-weight:600;font-size:.88rem">Importez dans EduKiosk</div><div style="font-size:.8rem;color:var(--mt)">Tests &#8594; Nouveau &#8594; Importer XML</div></div></div></div>';
 
     // Sauvegarder et tester l'URL API
@@ -1756,6 +1756,17 @@ function showTeacher(){
       });
     };
 
+    var sm=document.getElementById('smaster');
+    if(sm)sm.onclick=function(){
+      var nv=(document.getElementById('nmaster')||{}).value||'';
+      var msg=document.getElementById('mmsg');
+      if(nv.length<4){
+        if(msg){msg.className='merr';msg.textContent='4 caracteres minimum.';msg.style.display='';}
+      }else{
+        SS('ek_master',nv);MASTER=nv;
+        if(msg){msg.className='mok';msg.style.color='#7a5c00';msg.textContent='Code de secours mis a jour !';msg.style.display='';setTimeout(function(){msg.style.display='none';},3000);}
+      }
+    };
     var sp=document.getElementById('spin');if(sp)sp.onclick=function(){var nv=v('#npin'),msg=document.getElementById('pmsg');if(nv.length<4){if(msg){msg.className='merr';msg.textContent='4 caracteres minimum.';msg.style.display='';}}else{SS(K.p,nv);cloudPost('savePin',nv);if(msg){msg.className='mok';msg.textContent='Code PIN mis a jour !';msg.style.display='';setTimeout(function(){msg.style.display='none';},3000);}}};
     var cr=document.getElementById('clr-res');if(cr)cr.onclick=function(){customConfirm('Vider tous les resultats ? Cela liberera de l\'espace.',function(){results=[];SS(K.r,[]);bMain();showToast('Resultats effaces.');});};
   }
