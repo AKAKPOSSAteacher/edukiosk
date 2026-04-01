@@ -136,6 +136,84 @@ td{padding:9px 12px;border-bottom:1px solid var(--bd);}tr:last-child td{border-b
 .stbar{height:10px;background:var(--cr);border-radius:5px;overflow:hidden;margin-top:6px;}
 .stfill{height:100%;border-radius:5px;transition:width .5s;}
 .tc{text-align:center;}.tr{text-align:right;}.mt1{margin-top:1rem;}.mb1{margin-bottom:1rem;}
+
+/* ═══ RESPONSIVE SMARTPHONE (max 640px) ═══ */
+@media(max-width:640px){
+  /* Topbar */
+  .tb{padding:0 .85rem;height:52px;}
+  .tb-brand{font-size:.95rem;}
+  .tb-right{gap:6px;}
+  .tb-btn{padding:5px 9px;font-size:.75rem;}
+  #sync-status{display:none;}
+
+  /* Layout : sidebar devient nav en bas */
+  .layout{flex-direction:column;}
+  .sidebar{
+    width:100%;border-right:none;border-top:1px solid var(--bd);
+    padding:0;order:2;position:sticky;bottom:0;z-index:30;
+    display:flex;flex-direction:row;background:var(--sf);
+    box-shadow:0 -2px 12px rgba(15,32,68,.1);
+    overflow-x:auto;-webkit-overflow-scrolling:touch;
+  }
+  .si{
+    flex:1;min-width:60px;flex-direction:column;gap:2px;
+    padding:8px 4px;font-size:.62rem;text-align:center;
+    border-right:1px solid var(--bd);border-radius:0;
+  }
+  .si.on{border-right:1px solid var(--bd);border-top:3px solid var(--nv);border-bottom:none;}
+  .si:last-child{border-right:none;}
+
+  /* Main */
+  .main{padding:1rem .85rem;order:1;min-height:calc(100vh - 52px - 57px);}
+  .pg{font-size:1.1rem;margin-bottom:.85rem;}
+
+  /* Cards et boutons */
+  .ch{flex-wrap:wrap;gap:.5rem;}
+  .ch .row{flex-wrap:wrap;gap:5px;}
+  .card{padding:.9rem;}
+
+  /* Stats grid */
+  .stats{grid-template-columns:repeat(2,1fr);gap:.5rem;}
+  .sv{font-size:1.5rem;}
+
+  /* Tableaux : scroll horizontal */
+  .tbl{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{min-width:480px;}
+
+  /* Formulaires */
+  input[type=text],input[type=password],input[type=number],select,textarea{font-size:1rem;}
+
+  /* Test creator : grille 1 col */
+  .card div[style*="grid-template-columns:2fr 1fr 1fr"]{grid-template-columns:1fr!important;}
+  .card div[style*="grid-template-columns:2fr 1fr"]{grid-template-columns:1fr!important;}
+
+  /* Questions : paires correspondance */
+  .mpair{grid-template-columns:1fr auto;gap:5px;}
+
+  /* Boutons dans les cartes tests/docs */
+  .card .ch>div:last-child{width:100%;display:flex;flex-wrap:wrap;gap:5px;}
+
+  /* Modal session code */
+  .modal{padding:1.25rem;}
+  div[style*="font-size:3.5rem"][style*="letter-spacing:12px"]{font-size:2.5rem!important;letter-spacing:6px!important;}
+
+  /* Session actives dans home */
+  div[style*="min-width:180px"]{min-width:140px!important;}
+
+  /* Exam interface */
+  .exam-body{padding:1rem;}
+  .exam-h{padding:.75rem 1rem;gap:.5rem;}
+  .q-txt{font-size:.97rem;}
+
+  /* Login card */
+  .lcard{padding:1.75rem 1.25rem;}
+
+  /* Paramètres : URL input */
+  #api-url-inp{font-size:.72rem!important;}
+
+  /* Résultats : export/filtre */
+  .bk{font-size:.75rem;padding:7px 10px;}
+}
 </style>
 </head>
 <body>
