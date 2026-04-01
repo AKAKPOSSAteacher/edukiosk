@@ -167,38 +167,36 @@ td{padding:9px 12px;border-bottom:1px solid var(--bd);}tr:last-child td{border-b
   .main{padding:1rem .85rem;order:1;min-height:calc(100vh - 52px - 57px);}
   .pg{font-size:1.1rem;margin-bottom:.85rem;}
 
-  /* Cards et boutons */
+  /* Cards — empêcher tout débordement */
+  .card{padding:.9rem;overflow:hidden;}
   .ch{flex-wrap:wrap;gap:.5rem;}
+  .ch>div:first-child{min-width:0;flex:1;}
   .ch .row{flex-wrap:wrap;gap:5px;}
-  .card{padding:.9rem;}
 
   /* Stats grid */
   .stats{grid-template-columns:repeat(2,1fr);gap:.5rem;}
   .sv{font-size:1.5rem;}
 
-  /* Tableaux : scroll horizontal */
-  .tbl{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  table{min-width:480px;}
+  /* Tableaux : scroll horizontal strict */
+  .tbl{overflow-x:auto;-webkit-overflow-scrolling:touch;display:block;width:100%;}
+  .tbl table{white-space:nowrap;font-size:.76rem;width:auto;}
+  .tbl th,.tbl td{padding:6px 8px!important;}
+
+  /* Tableaux inline dans les cards (infractions) */
+  .card div[style*="overflow-x:auto"]{margin:0 -.9rem;padding:0 .9rem;}
 
   /* Formulaires */
   input[type=text],input[type=password],input[type=number],select,textarea{font-size:1rem;}
 
-  /* Test creator : grille 1 col */
+  /* Test creator : grilles en 1 col */
   .card div[style*="grid-template-columns:2fr 1fr 1fr"]{grid-template-columns:1fr!important;}
   .card div[style*="grid-template-columns:2fr 1fr"]{grid-template-columns:1fr!important;}
 
   /* Questions : paires correspondance */
   .mpair{grid-template-columns:1fr auto;gap:5px;}
 
-  /* Boutons dans les cartes tests/docs */
-  .card .ch>div:last-child{width:100%;display:flex;flex-wrap:wrap;gap:5px;}
-
   /* Modal session code */
   .modal{padding:1.25rem;}
-  div[style*="font-size:3.5rem"][style*="letter-spacing:12px"]{font-size:2.5rem!important;letter-spacing:6px!important;}
-
-  /* Session actives dans home */
-  div[style*="min-width:180px"]{min-width:140px!important;}
 
   /* Exam interface */
   .exam-body{padding:1rem;}
@@ -210,21 +208,6 @@ td{padding:9px 12px;border-bottom:1px solid var(--bd);}tr:last-child td{border-b
 
   /* Paramètres : URL input */
   #api-url-inp{font-size:.72rem!important;}
-
-  /* Liens dans les cartes documents — tronquer sur mobile */
-  .card div[style*="max-height:44px"]{
-    white-space:nowrap!important;overflow:hidden!important;
-    text-overflow:ellipsis!important;max-height:1.4rem!important;
-    font-size:.72rem;display:block;
-  }
-
-  /* Tableaux : forcer scroll horizontal */
-  .tbl{overflow-x:auto!important;-webkit-overflow-scrolling:touch;display:block;width:100%;}
-  .tbl table{white-space:nowrap;font-size:.76rem;}
-  .tbl th,.tbl td{padding:6px 8px!important;}
-
-  /* Textes longs dans cartes */
-  .cm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
 }</style>
 </head>
 <body>
