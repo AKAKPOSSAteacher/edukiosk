@@ -211,12 +211,21 @@ td{padding:9px 12px;border-bottom:1px solid var(--bd);}tr:last-child td{border-b
   /* Paramètres : URL input */
   #api-url-inp{font-size:.72rem!important;}
 
-  /* Liens dans les cartes documents */
+  /* Liens dans les cartes documents — tronquer sur mobile */
   .card div[style*="max-height:44px"]{
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    max-height:none!important;font-size:.72rem;
+    white-space:nowrap!important;overflow:hidden!important;
+    text-overflow:ellipsis!important;max-height:1.4rem!important;
+    font-size:.72rem;display:block;
   }
-</style>
+
+  /* Tableaux : forcer scroll horizontal */
+  .tbl{overflow-x:auto!important;-webkit-overflow-scrolling:touch;display:block;width:100%;}
+  table{min-width:420px;font-size:.76rem;}
+  th,td{padding:6px 8px!important;white-space:nowrap;}
+
+  /* Textes longs dans cartes */
+  .cm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+}</style>
 </head>
 <body>
 <div id="root">Chargement...</div>
