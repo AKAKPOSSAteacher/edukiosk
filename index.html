@@ -220,8 +220,8 @@ td{padding:9px 12px;border-bottom:1px solid var(--bd);}tr:last-child td{border-b
 
   /* Tableaux : forcer scroll horizontal */
   .tbl{overflow-x:auto!important;-webkit-overflow-scrolling:touch;display:block;width:100%;}
-  table{min-width:420px;font-size:.76rem;}
-  th,td{padding:6px 8px!important;white-space:nowrap;}
+  .tbl table{white-space:nowrap;font-size:.76rem;}
+  .tbl th,.tbl td{padding:6px 8px!important;}
 
   /* Textes longs dans cartes */
   .cm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
@@ -1322,7 +1322,7 @@ function showTeacher(){
     if(withInfr.length){
       iDiv.style.cssText='background:#fff5f5;border:1.5px solid #f5c2be;border-radius:var(--r);padding:1.25rem;margin-bottom:.9rem;';
       var iHtml='<div style="font-weight:700;color:var(--rd);font-size:.97rem;margin-bottom:1rem">&#9888; Infractions de navigation ('+withInfr.length+' session(s) concernee(s))</div>';
-      iHtml+='<table style="width:100%;border-collapse:collapse;font-size:.84rem"><thead><tr>'
+      iHtml+='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;border-collapse:collapse;font-size:.84rem;min-width:380px"><thead><tr>'
         +'<th style="text-align:left;padding:6px 8px;font-size:.7rem;text-transform:uppercase;color:var(--mt);border-bottom:1px solid #f5c2be;font-weight:700">Eleve</th>'
         +'<th style="text-align:left;padding:6px 8px;font-size:.7rem;text-transform:uppercase;color:var(--mt);border-bottom:1px solid #f5c2be;font-weight:700">Classe</th>'
         +'<th style="text-align:left;padding:6px 8px;font-size:.7rem;text-transform:uppercase;color:var(--mt);border-bottom:1px solid #f5c2be;font-weight:700">Test / Doc</th>'
@@ -1342,7 +1342,7 @@ function showTeacher(){
           +'</td>'
           +'</tr>';
       });
-      iHtml+='</tbody></table>';
+      iHtml+='</tbody></table></div>';
       iDiv.innerHTML=iHtml;
     }else{
       iDiv.style.cssText='background:#eafaf1;border:1.5px solid #a9dfbf;border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:.9rem;display:flex;align-items:center;gap:10px;';
@@ -1618,7 +1618,7 @@ function showTeacher(){
     if(!docs.length){mn.insertAdjacentHTML('beforeend','<div class="card tc" style="color:var(--mt)">Aucun document.</div>');return;}
     docs.forEach(function(d){
       var div=document.createElement('div');div.className='card';
-      div.innerHTML='<div class="ch"><div><div class="ct">'+d.title+'</div><div class="cm">'+d.subject+(d.docType==='link'?' <span class="bdg b-tl" style="font-size:.65rem">Lien</span>':'')+'</div><div style="font-size:.78rem;color:var(--mt);margin-top:4px;max-height:44px;overflow:hidden;opacity:.8">'+(d.docType==='link'?(d.linkUrl||'').slice(0,80):'('+d.docType+')')+'</div></div><div class="row" style="gap:7px"><button class="btn bk bsm" data-a="sess" data-id="'+d.id+'">&#9654; Demarrer session</button><button class="btn br bsm" data-a="del" data-id="'+d.id+'">X</button></div></div>';
+      div.innerHTML='<div class="ch"><div style="min-width:0;flex:1"><div class="ct">'+d.title+'</div><div class="cm">'+d.subject+(d.docType==='link'?' <span class="bdg b-tl" style="font-size:.65rem">Lien</span>':'')+'</div><div style="font-size:.78rem;color:var(--mt);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+(d.docType==='link'?(d.linkUrl||'').slice(0,80):'('+d.docType+')')+'</div></div><div class="row" style="gap:7px;flex-shrink:0"><button class="btn bk bsm" data-a="sess" data-id="'+d.id+'">&#9654; Demarrer session</button><button class="btn br bsm" data-a="del" data-id="'+d.id+'">X</button></div></div>';
       div.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){var id=+b.dataset.id,d2=docs.find(function(x){return x.id===id;});if(!d2)return;if(b.dataset.a==='sess')showSessionModal('doc',d2);else if(b.dataset.a==='del'){customConfirm('Supprimer le document "'+d2.title+'" ?',function(){docs=docs.filter(function(x){return x.id!==id;});svD();bMain();});}};});
       mn.appendChild(div);
     });
