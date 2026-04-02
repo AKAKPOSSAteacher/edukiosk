@@ -563,8 +563,13 @@ function exportXML(test){
 }
 
 function exportTestXLS(test){
-  var rows=results.filter(function(r){return r.testTitle===test.title||r.testId===test.id;});
-  if(!rows.length){alert('Aucun résultat pour "'+test.title+'". Synchronisez d\'abord.');return;}
+  var localR=SL(K.r,[]);
+  var rows=localR.filter(function(r){return r.testId===test.id||r.testTitle===test.title;});
+  if(!rows.length){
+    // Fallback sur résultats cloud (sans testId)
+    rows=results.filter(function(r){return r.testTitle===test.title;});
+  }
+  if(!rows.length){alert('Aucun résultat. Faites d\'abord passer le test puis actualisez.');return;}
   var xml='<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>'
     +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
     +'<Styles><Style ss:ID="H"><Font ss:Bold="1"/><Interior ss:Color="#0F2044" ss:Pattern="Solid"/><Font ss:Color="#FFFFFF" ss:Bold="1"/></Style>'
@@ -913,6 +918,7 @@ function showLogin(){
     if(sess&&sess.active){
       btn.disabled=false;if(loading)loading.style.display='none';
       if(sess.resources&&sess.resources.length)SS(K.res,sess.resources);
+      localStorage.setItem('ek_cur_code',code); // stocker le code courant
       var localData=Object.assign({},sess.data,{allowResources:!!sess.allowResources,showAnswers:sess.showAnswers!==false});
       runKiosk(localData,sess.type,{name:name,classe:cl});
       return;
@@ -972,6 +978,7 @@ function showLogin(){
           return;
         }
         var sessions=SL(K.s,{});sessions[code]=sess;SS(K.s,sessions);
+        localStorage.setItem('ek_cur_code',code); // stocker le code courant
         // Passer allowResources dans le payload
         var finalData=Object.assign({},sess.data,{allowResources:!!sess.allowResources,showAnswers:sess.showAnswers!==false});
         runKiosk(finalData,sess.type,{name:name,classe:cl});
@@ -999,7 +1006,7 @@ function showLogin(){
   }
 
   // Toujours mettre à jour l'URL avec la dernière version
-  API_URL='https://script.google.com/macros/s/AKfycbydos6n3Vje2nxeLrVb9azPVqSVv58Uzkck4O4XB0ToGYVg0viD5_jPxRqdxGk_P47o/exec';
+  API_URL='https://script.google.com/macros/s/AKfycbxvHPftuP0iVfGxba2g3sS8_koSU358bCTdmHCSFOZ_71_Fljfi-XqjKaei_9nxHPPC/exec';
   SS('ek_api',API_URL);
   cloudGet(function(){MASTER=SL('ek_master','****');});
 }
@@ -1152,23 +1159,13 @@ function runKiosk(payload,type,student){
 
   startAC(showLock,showSS,type==='doc');
 
-  function finish(cloudResult,localResult){
+  function finish(result){
     stopAC();
     releaseWakeLock();
     _liveStudent=null;
     SS(K.k,null);
-    SS('ek_show_ans','1'); // reset à la valeur par défaut
-    if(cloudResult){
-      // Sauvegarder résultat léger dans K.r
-      var all=[].concat(SL(K.r,[]));all.push(cloudResult);
-      try{SS(K.r,all);}catch(e){}
-      cloudPost('saveResult',cloudResult);
-      // Sauvegarder breakdown séparément par clé unique
-      if(localResult&&localResult.breakdown){
-        var bkKey='ek_bk_'+cloudResult.studentName+'__'+cloudResult.testTitle+'__'+cloudResult.date;
-        try{SS(bkKey,localResult.breakdown);}catch(e){}
-      }
-    }
+    localStorage.setItem('ek_cur_code','');
+    if(result){cloudPost('saveResult',result);}
     showDone();
   }
 
@@ -1420,14 +1417,11 @@ function runExam(container,exam,student,onDone){
     +'</div>';
 
     var rr=document.getElementById('rrows');
-    // Lire showAnswers depuis la session active dans localStorage
+    // Lire showAnswers depuis la session en cours (via code courant)
+    var _curCode=localStorage.getItem('ek_cur_code');
     var _sessions=SL(K.s,{});
-    var _activeSess=null;
-    Object.keys(_sessions).forEach(function(code){
-      var s=_sessions[code];
-      if(s&&s.active&&!_activeSess)_activeSess=s;
-    });
-    var showAns=_activeSess?_activeSess.showAnswers!==false:true;
+    var _curSess=_curCode?_sessions[_curCode]:null;
+    var showAns=_curSess?_curSess.showAnswers!==false:true;
     if(showAns){
       breakdown.forEach(function(b,i){
       var row=document.createElement('div');
@@ -1509,7 +1503,6 @@ function runExam(container,exam,student,onDone){
                 pairs:(b.pairs||[]).map(function(p){return {l:p.l,r:p.r};}),
                 blanks:(b.blanks||[]).map(function(bl){return {v:bl.v};})};
       });
-      // Résultat léger pour le cloud (sans breakdown)
       var cloudResult={
         score:sc.score,max:sc.max,pct:sc.pct,manual:sc.manual,
         infractions:_infractions,
@@ -1517,9 +1510,24 @@ function runExam(container,exam,student,onDone){
         testId:exam.id,testTitle:exam.title,subject:exam.subject,
         date:new Date().toLocaleDateString('fr-FR')
       };
-      // Résultat complet pour localStorage (avec breakdown)
-      var localResult=Object.assign({},cloudResult,{breakdown:cleanBreakdown});
-      onDone(cloudResult,localResult);
+      // Sauvegarder résultat dans K.r
+      var all=[].concat(SL(K.r,[]));
+      all.push(Object.assign({},cloudResult,{breakdown:cleanBreakdown}));
+      try{SS(K.r,all);}catch(e){SS(K.r,[cloudResult]);}
+      // Envoyer au cloud
+      cloudPost('saveResult',cloudResult);
+      // Envoyer le détail des réponses vers Sheets (AnswersDetail)
+      if(API_URL&&cleanBreakdown.length){
+        var detailPayload={
+          studentName:student.name,
+          classe:student.classe,
+          testTitle:exam.title,
+          date:new Date().toLocaleDateString('fr-FR'),
+          breakdown:cleanBreakdown
+        };
+        new Image().src=API_URL+'?action=saveAnswerDetail&data='+encodeURIComponent(JSON.stringify(detailPayload))+'&t='+Date.now();
+      }
+      onDone(cloudResult);
     };
   }
 
@@ -1569,7 +1577,7 @@ function showTeacher(){
 
   // Stocker l'URL API si pas encore fait
   // Toujours mettre à jour l'URL avec la dernière version
-  SS('ek_api','https://script.google.com/macros/s/AKfycbydos6n3Vje2nxeLrVb9azPVqSVv58Uzkck4O4XB0ToGYVg0viD5_jPxRqdxGk_P47o/exec');
+  SS('ek_api','https://script.google.com/macros/s/AKfycbxvHPftuP0iVfGxba2g3sS8_koSU358bCTdmHCSFOZ_71_Fljfi-XqjKaei_9nxHPPC/exec');
   API_URL=SL('ek_api','');
 
   render('<div id="tb" class="tb"><div class="tb-brand"><div class="tb-dot"></div>EduKiosk <span class="bdg b-gd" style="margin-left:8px">PROF</span></div><div class="tb-right"><span id="sync-status" style="font-size:.75rem;opacity:.8;margin-right:4px"></span><button class="tb-btn" id="tb-sync">&#8635; Sync</button><button class="tb-btn" id="tl">Deconnexion</button></div></div><div class="layout"><div class="sidebar" id="tnav"></div><div class="main" id="tmain"></div></div>');
@@ -1874,7 +1882,7 @@ function showTeacher(){
         ?'<label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--mt);cursor:pointer;margin-top:6px"><input type="checkbox" class="res-chk" '+(opts.allowRes?'checked':'')+' style="accent-color:var(--nv);cursor:pointer"> &#128218; Ressources autorisees</label>'
         :'';
       var ansCheck='<label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--mt);cursor:pointer;margin-top:6px"><input type="checkbox" class="ans-chk" '+(opts.showAnswers!==false?'checked':'')+' style="accent-color:var(--nv);cursor:pointer"> &#128065; Afficher les reponses aux eleves</label>';
-      d.innerHTML='<div><div class="ch" style="margin-bottom:4px"><div><div class="ct">'+t.title+'</div><div class="cm">'+t.subject+' · '+t.duration+'min · '+t.questions.length+'q'+(t.shuffle?' · <span style="color:#6d4aff;font-weight:700">Q.aleatoires</span>':'')+(t.noBack?' · <span style="color:var(--rd);font-weight:700">sans retour</span>':'')+'</div><div style="font-size:.74rem;color:var(--mt);margin-top:4px">'+results.filter(function(r){return r.testId===t.id;}).length+' resultat(s)</div></div><div class="row" style="gap:7px;flex-wrap:wrap"><button class="btn bk bsm" data-a="sess" data-id="'+t.id+'">&#9654; Demarrer session</button><span class="bdg '+(t.active?'b-gn':'b-rd')+'">'+(t.active?'Actif':'Inactif')+'</span><button class="btn bn bsm" data-a="xml" data-id="'+t.id+'">XML</button><button class="btn bo bsm" data-a="tog" data-id="'+t.id+'">'+(t.active?'Desactiver':'Activer')+'</button><button class="btn bg bsm" data-a="xls" data-id="'+t.id+'">&#128190; Excel</button><button class="btn br bsm" data-a="clr" data-id="'+t.id+'">&#128465;</button><button class="btn br bsm" data-a="del" data-id="'+t.id+'">X</button></div></div>'
+      d.innerHTML='<div><div class="ch" style="margin-bottom:4px"><div><div class="ct">'+t.title+'</div><div class="cm">'+t.subject+' · '+t.duration+'min · '+t.questions.length+'q'+(t.shuffle?' · <span style="color:#6d4aff;font-weight:700">Q.aleatoires</span>':'')+(t.noBack?' · <span style="color:var(--rd);font-weight:700">sans retour</span>':'')+'</div><div style="font-size:.74rem;color:var(--mt);margin-top:4px">'+results.filter(function(r){return r.testId===t.id||r.testTitle===t.title;}).length+' resultat(s)</div></div><div class="row" style="gap:7px;flex-wrap:wrap"><button class="btn bk bsm" data-a="sess" data-id="'+t.id+'">&#9654; Demarrer session</button><span class="bdg '+(t.active?'b-gn':'b-rd')+'">'+(t.active?'Actif':'Inactif')+'</span><button class="btn bn bsm" data-a="xml" data-id="'+t.id+'">XML</button><button class="btn bo bsm" data-a="tog" data-id="'+t.id+'">'+(t.active?'Desactiver':'Activer')+'</button><button class="btn bg bsm" data-a="xls" data-id="'+t.id+'">&#128190; Excel</button><button class="btn br bsm" data-a="clr" data-id="'+t.id+'">&#128465;</button><button class="btn br bsm" data-a="del" data-id="'+t.id+'">X</button></div></div>'
         +ansCheck
         +resCheck
       +'</div>';
