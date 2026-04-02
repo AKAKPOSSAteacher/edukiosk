@@ -215,6 +215,7 @@ td{padding:9px 12px;border-bottom:1px solid var(--bd);}tr:last-child td{border-b
   /* Paramètres */
   #api-url-inp{font-size:.72rem!important;}
 }</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div id="root">Chargement...</div>
@@ -416,6 +417,75 @@ function shareUrl(type,obj){return location.origin+location.pathname+'#'+type+'=
 function urlPayload(){var h=location.hash;if(h.startsWith('#exam='))return{type:'exam',data:dec(h.slice(6))};if(h.startsWith('#doc='))return{type:'doc',data:dec(h.slice(5))};return null;}
 
 /* XML MOODLE */
+function parseKahoot(arrayBuffer){
+  if(typeof XLSX==='undefined')throw new Error('SheetJS non charge.');
+  var wb=XLSX.read(arrayBuffer,{type:'array'});
+  var ws=wb.Sheets[wb.SheetNames[0]];
+  var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  if(!rows.length)throw new Error('Fichier vide');
+
+  // Format Kahoot : trouver la ligne d'en-tête contenant "Question"
+  var headerIdx=-1;
+  for(var i=0;i<Math.min(rows.length,15);i++){
+    var row=rows[i];
+    for(var j=0;j<row.length;j++){
+      var cell=String(row[j]||'').toLowerCase();
+      if(cell.indexOf('question')>=0&&cell.indexOf('max')>=0){headerIdx=i;break;}
+    }
+    if(headerIdx>=0)break;
+  }
+  if(headerIdx===-1)throw new Error('En-tete Kahoot introuvable. Verifiez le format du fichier.');
+
+  var headers=rows[headerIdx];
+  // Trouver les indices des colonnes
+  var qIdx=-1,a1=-1,a2=-1,a3=-1,a4=-1,corrIdx=-1;
+  for(var k=0;k<headers.length;k++){
+    var h=String(headers[k]||'').toLowerCase();
+    if(h.indexOf('question')>=0&&qIdx===-1)qIdx=k;
+    else if(h.indexOf('answer 1')>=0||h.indexOf('answer1')>=0)a1=k;
+    else if(h.indexOf('answer 2')>=0||h.indexOf('answer2')>=0)a2=k;
+    else if(h.indexOf('answer 3')>=0||h.indexOf('answer3')>=0)a3=k;
+    else if(h.indexOf('answer 4')>=0||h.indexOf('answer4')>=0)a4=k;
+    else if(h.indexOf('correct')>=0)corrIdx=k;
+  }
+  if(qIdx===-1)throw new Error('Colonne Question introuvable.');
+  if(a1===-1)throw new Error('Colonne Answer 1 introuvable.');
+
+  var questions=[];
+  for(var r=headerIdx+1;r<rows.length;r++){
+    var row=rows[r];
+    var qText=String(row[qIdx]||'').trim();
+    if(!qText||qText==='NaN')continue;
+
+    var opts=[];
+    [a1,a2,a3,a4].forEach(function(idx){
+      if(idx>=0){var v=String(row[idx]||'').trim();if(v&&v!=='NaN')opts.push(v);}
+    });
+    if(!opts.length)continue;
+
+    // Bonne réponse : Kahoot utilise "1", "2", "1,2" etc. (1-indexé)
+    var corrRaw=String(row[corrIdx]||'').trim();
+    var answerIdx=0;
+    if(corrRaw){
+      // Prendre le premier chiffre (en cas de réponses multiples, prendre la première)
+      var firstCorr=corrRaw.split(',')[0].trim();
+      var num=parseInt(firstCorr,10);
+      if(!isNaN(num)&&num>=1&&num<=opts.length)answerIdx=num-1;
+    }
+
+    questions.push({
+      id:Date.now()+Math.random(),
+      type:'qcm',
+      text:qText,
+      note:'',
+      options:opts,
+      answer:answerIdx
+    });
+  }
+  if(!questions.length)throw new Error('Aucune question trouvee dans le fichier.');
+  return questions;
+}
+
 function parseXML(xmlStr){
   var p=new DOMParser(),doc=p.parseFromString(xmlStr,'text/xml');
   if(doc.querySelector('parsererror'))throw new Error('XML invalide');
@@ -1227,16 +1297,82 @@ function runExam(container,exam,student,onDone){
 
   function showResult(){
     var sc=calcScore(questions,answers);
-    container.innerHTML='<div style="max-width:640px;margin:0 auto"><div style="background:'+(sc.pct>=50?'var(--gn)':'var(--rd)')+';color:#fff;padding:1.1rem 1.5rem;border-radius:var(--r) var(--r) 0 0;text-align:center"><div style="font-weight:800;font-size:1.05rem">Evaluation terminee</div><div style="font-size:.8rem;opacity:.8;margin-top:2px">'+student.name+' — '+student.classe+'</div></div><div class="exam-body"><div class="sring"><div class="sn">'+sc.pct+'%</div><div class="ss">'+sc.score+'/'+sc.max+'</div></div>'+(_infractions>0?'<div class="merr">⚠ '+_infractions+' infraction(s).</div>':'')+(sc.manual>0?'<div class="mwarn mb1">'+sc.manual+' question(s) a correction manuelle.</div>':'')+'<div id="rrows"></div><div class="tc mt1" style="padding:1rem;background:var(--cr);border-radius:8px;font-size:.82rem;color:var(--mt)">Montrez cet ecran a votre professeur.</div><button class="btn bn bfull mt1" id="rbtn">Terminer la session</button></div></div>';
-    var rr=document.getElementById('rrows');
-    questions.forEach(function(q,i){
+
+    // Construire le détail par question
+    var breakdown=questions.map(function(q,i){
       var a=answers[q.id],ok=null;
       if(q.type==='qcm'||q.type==='vf')ok=a===q.answer;
       else if(q.type==='short')ok=q.expected?(a||'').trim().toLowerCase()===q.expected.trim().toLowerCase():null;
-      var row=document.createElement('div');row.className='rrow';row.innerHTML='<span>'+(ok===true?'✅':ok===false?'❌':'📋')+'</span><div style="flex:1"><div style="font-size:.86rem;font-weight:600">Q'+(i+1)+' — '+QTYPES.find(function(t){return t.id===q.type;}).l+'</div></div>';
+      return {q:q.text,type:q.type,options:q.options||[],answer:q.answer,given:a,ok:ok,expected:q.expected||''};
+    });
+
+    container.innerHTML='<div style="max-width:640px;margin:0 auto">'
+      +'<div style="background:'+(sc.pct>=50?'var(--gn)':'var(--rd)')+';color:#fff;padding:1.1rem 1.5rem;border-radius:var(--r) var(--r) 0 0;text-align:center">'
+        +'<div style="font-weight:800;font-size:1.05rem">Evaluation terminee</div>'
+        +'<div style="font-size:.8rem;opacity:.8;margin-top:2px">'+student.name+' — '+student.classe+'</div>'
+      +'</div>'
+      +'<div class="exam-body">'
+        +'<div class="sring"><div class="sn">'+sc.pct+'%</div><div class="ss">'+sc.score+'/'+sc.max+'</div></div>'
+        +(_infractions>0?'<div class="merr">⚠ '+_infractions+' infraction(s).</div>':'')
+        +(sc.manual>0?'<div class="mwarn mb1">'+sc.manual+' question(s) a correction manuelle.</div>':'')
+        +'<div id="rrows"></div>'
+        +'<div class="tc mt1" style="padding:1rem;background:var(--cr);border-radius:8px;font-size:.82rem;color:var(--mt)">Montrez cet ecran a votre professeur.</div>'
+        +'<button class="btn bn bfull mt1" id="rbtn">Terminer la session</button>'
+      +'</div>'
+    +'</div>';
+
+    var rr=document.getElementById('rrows');
+    breakdown.forEach(function(b,i){
+      var row=document.createElement('div');
+      row.style.cssText='background:var(--sf);border:1.5px solid '+(b.ok===true?'#a9dfbf':b.ok===false?'#f5c2be':'#e0dbd2')+';border-radius:10px;padding:.9rem;margin-bottom:.7rem;';
+
+      // En-tête question
+      var html='<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:.6rem">'
+        +'<span style="font-size:1.1rem;flex-shrink:0">'+(b.ok===true?'✅':b.ok===false?'❌':'📋')+'</span>'
+        +'<div style="font-weight:600;font-size:.9rem;color:var(--nv);line-height:1.4">Q'+(i+1)+' — '+b.q+'</div>'
+      +'</div>';
+
+      // Options QCM
+      if(b.type==='qcm'&&b.options&&b.options.length){
+        html+='<div style="display:flex;flex-direction:column;gap:5px">';
+        b.options.forEach(function(opt,oi){
+          var isCorrect=oi===b.answer;
+          var isGiven=oi===b.given;
+          var bg=isCorrect?'#eafaf1':isGiven&&!isCorrect?'#fdecea':'var(--cr)';
+          var border=isCorrect?'#27ae60':isGiven&&!isCorrect?'#c0392b':'var(--bd)';
+          var icon=isCorrect?'✓':isGiven&&!isCorrect?'✗':'';
+          html+='<div style="background:'+bg+';border:1.5px solid '+border+';border-radius:7px;padding:6px 10px;font-size:.84rem;display:flex;align-items:center;gap:8px">'
+            +(icon?'<span style="font-weight:800;color:'+(isCorrect?'var(--gn)':'var(--rd)')+'">'+icon+'</span>':'<span style="width:16px"></span>')
+            +opt
+          +'</div>';
+        });
+        html+='</div>';
+      }
+      // Vrai/Faux
+      else if(b.type==='vf'){
+        var corrLabel=b.answer===true?'Vrai':'Faux';
+        var givenLabel=b.given===true?'Vrai':b.given===false?'Faux':'—';
+        html+='<div style="font-size:.84rem;color:var(--mt)">Votre réponse : <strong style="color:'+(b.ok?'var(--gn)':'var(--rd)')+'">'+givenLabel+'</strong> — Bonne réponse : <strong style="color:var(--gn)">'+corrLabel+'</strong></div>';
+      }
+      // Réponse courte
+      else if(b.type==='short'){
+        html+='<div style="font-size:.84rem;color:var(--mt)">Votre réponse : <strong>'+(b.given||'—')+'</strong>'+(b.expected?' — Attendu : <strong style="color:var(--gn)">'+b.expected+'</strong>':'')+'</div>';
+      }
+
+      row.innerHTML=html;
       if(rr)rr.appendChild(row);
     });
-    var rb=document.getElementById('rbtn');if(rb)rb.onclick=function(){onDone({score:sc.score,max:sc.max,pct:sc.pct,manual:sc.manual,infractions:_infractions,studentName:student.name,classe:student.classe,testId:exam.id,testTitle:exam.title,subject:exam.subject,date:new Date().toLocaleDateString('fr-FR')});};
+
+    var rb=document.getElementById('rbtn');if(rb)rb.onclick=function(){
+      onDone({
+        score:sc.score,max:sc.max,pct:sc.pct,manual:sc.manual,
+        infractions:_infractions,
+        studentName:student.name,classe:student.classe,
+        testId:exam.id,testTitle:exam.title,subject:exam.subject,
+        date:new Date().toLocaleDateString('fr-FR'),
+        breakdown:breakdown
+      });
+    };
   }
 
   renderQ();
@@ -1603,9 +1739,29 @@ function showTeacher(){
 
   function bTestCreator(mn){
     var qs=[mkQ('qcm')];
-    mn.innerHTML='<div class="ch mb1"><h1 class="pg" style="margin:0">Nouveau test</h1><button class="btn bo bsm" id="tcc">Annuler</button></div><div id="tce" style="display:none"></div><div class="card"><div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:1rem"><div><label>Titre</label><input type="text" id="tct"></div><div><label>Matiere</label><select id="tcs"><option>Anglais</option><option>Francais</option><option>Mathematiques</option><option>Histoire-Geo</option><option>SVT</option><option>Physique-Chimie</option><option>Autre</option></select></div><div><label>Duree (min)</label><input type="number" id="tcd" value="15" min="5" max="180"></div></div><div style="display:flex;gap:1.5rem;margin-top:1rem;flex-wrap:wrap"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:.88rem;color:var(--tx);font-weight:600"><input type="checkbox" id="tc-shuffle" style="width:16px;height:16px;margin:0;margin-bottom:0;accent-color:var(--nv)"> Ordre des questions aleatoire</label><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:.88rem;color:var(--tx);font-weight:600"><input type="checkbox" id="tc-noback" style="width:16px;height:16px;margin:0;margin-bottom:0;accent-color:var(--nv)"> Retour en arriere interdit</label></div><div class="xbanner"><div style="font-weight:800;margin-bottom:4px">Importer XML Moodle</div><div style="font-size:.82rem;opacity:.85;margin-bottom:10px">Generez vos QCM avec Claude, puis importez le fichier XML ici.</div><input type="file" id="tcxf" accept=".xml,text/xml" style="display:none"><button class="btn" style="background:#fff;color:#6d4aff;font-weight:800" id="tcxb">Importer XML</button></div></div><div id="tcqb"></div><div class="row" style="flex-wrap:wrap;gap:8px;margin-top:.5rem" id="tcab"><span style="font-size:.8rem;color:var(--mt)">Ajouter :</span></div>';
+    mn.innerHTML='<div class="ch mb1"><h1 class="pg" style="margin:0">Nouveau test</h1><button class="btn bo bsm" id="tcc">Annuler</button></div><div id="tce" style="display:none"></div><div class="card"><div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:1rem"><div><label>Titre</label><input type="text" id="tct"></div><div><label>Matiere</label><select id="tcs"><option>Anglais</option><option>Francais</option><option>Mathematiques</option><option>Histoire-Geo</option><option>SVT</option><option>Physique-Chimie</option><option>Autre</option></select></div><div><label>Duree (min)</label><input type="number" id="tcd" value="15" min="5" max="180"></div></div><div style="display:flex;gap:1.5rem;margin-top:1rem;flex-wrap:wrap"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:.88rem;color:var(--tx);font-weight:600"><input type="checkbox" id="tc-shuffle" style="width:16px;height:16px;margin:0;margin-bottom:0;accent-color:var(--nv)"> Ordre des questions aleatoire</label><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:.88rem;color:var(--tx);font-weight:600"><input type="checkbox" id="tc-noback" style="width:16px;height:16px;margin:0;margin-bottom:0;accent-color:var(--nv)"> Retour en arriere interdit</label></div><div class="xbanner"><div style="font-weight:800;margin-bottom:4px">Importer XML Moodle</div><div style="font-size:.82rem;opacity:.85;margin-bottom:10px">Generez vos QCM avec Claude, puis importez le fichier XML ici.</div><input type="file" id="tcxf" accept=".xml,text/xml" style="display:none"><button class="btn" style="background:#fff;color:#6d4aff;font-weight:800" id="tcxb">Importer XML</button></div><div class="xbanner" style="background:linear-gradient(135deg,#46166b,#7b2d8b);margin-top:.75rem"><div style="font-weight:800;margin-bottom:4px">&#127381; Importer Kahoot .xlsx</div><div style="font-size:.82rem;opacity:.85;margin-bottom:10px">Exportez votre Kahoot en Excel puis importez-le ici.</div><input type="file" id="tckhf" accept=".xlsx" style="display:none"><button class="btn" style="background:#fff;color:#46166b;font-weight:800" id="tckhb">Importer Kahoot</button></div></div><div id="tcqb"></div><div class="row" style="flex-wrap:wrap;gap:8px;margin-top:.5rem" id="tcab"><span style="font-size:.8rem;color:var(--mt)">Ajouter :</span></div>';
     var tcc=document.getElementById('tcc');if(tcc)tcc.onclick=function(){creating=null;bNav();bMain();};
-    var tcxb=document.getElementById('tcxb');if(tcxb)tcxb.onclick=function(){var f=document.getElementById('tcxf');if(f)f.click();};
+    var tckhb=document.getElementById('tckhb');if(tckhb)tckhb.onclick=function(){var f=document.getElementById('tckhf');if(f)f.click();};
+    var tckhf=document.getElementById('tckhf');if(tckhf)tckhf.onchange=function(e){
+      var file=e.target.files[0];if(!file)return;
+      var er=document.getElementById('tce');
+      var rd=new FileReader();
+      rd.onload=function(ev){
+        try{
+          var parsed=parseKahoot(ev.target.result);
+          if(!parsed.length)throw new Error('Aucune question trouvee');
+          qs=qs.concat(parsed);
+          var ti=document.getElementById('tct');
+          if(!v('#tct').trim()&&ti)ti.value=file.name.replace(/\.xlsx$/i,'').replace(/_/g,' ');
+          rblk();
+          if(er)er.style.display='none';
+        }catch(ex){
+          if(er){er.className='merr';er.textContent='Erreur Kahoot : '+ex.message;er.style.display='';}
+        }
+      };
+      rd.readAsArrayBuffer(file);
+      tckhf.value='';
+    };
     var tcxf=document.getElementById('tcxf');if(tcxf)tcxf.onchange=function(e){var file=e.target.files[0];if(!file)return;var rd=new FileReader();rd.onload=function(ev){try{var parsed=parseXML(ev.target.result);if(!parsed.length)throw new Error('Aucune question');qs=qs.concat(parsed);var ti=document.getElementById('tct');if(!v('#tct').trim()&&ti)ti.value=file.name.replace(/\.xml$/i,'').replace(/_/g,' ');rblk();var er=document.getElementById('tce');if(er)er.style.display='none';}catch(ex){var er2=document.getElementById('tce');if(er2){er2.className='merr';er2.textContent='Erreur XML : '+ex.message;er2.style.display='';}}};rd.readAsText(file);tcxf.value='';};
     var tcab=document.getElementById('tcab');
     QTYPES.forEach(function(t){var b=document.createElement('button');b.className='btn bo bsm';b.textContent=t.l;b.dataset.qt=t.id;b.onclick=function(){qs.push(mkQ(t.id));rblk();};if(tcab)tcab.appendChild(b);});
@@ -1889,7 +2045,7 @@ function showTeacher(){
   function bTestResTable(rows){
     var wrap=document.createElement('div');wrap.className='tbl';
     var t=document.createElement('table');
-    t.innerHTML='<thead><tr><th>Date</th><th>Eleve</th><th>Classe</th><th>Test</th><th>Score</th><th>Infractions</th></tr></thead>';
+    t.innerHTML='<thead><tr><th>Date</th><th>Eleve</th><th>Classe</th><th>Test</th><th>Score</th><th>Infractions</th><th></th></tr></thead>';
     var tb=document.createElement('tbody');
     rows.forEach(function(r){
       var tr=document.createElement('tr');var inf=r.infractions||0;
@@ -1900,10 +2056,52 @@ function showTeacher(){
         +'<td>'+(r.abandoned
           ?'<span style="background:#7c3aed;color:#fff;padding:3px 9px;border-radius:20px;font-size:.75rem;font-weight:700">Abandonne</span>'
           :(r.pct!=null?'<span style="font-weight:700;color:'+(r.pct>=50?'var(--gn)':'var(--rd)')+'">'+r.pct+'%</span><span style="font-size:.76rem;color:var(--mt)"> ('+r.score+'/'+r.max+')</span>':'—'))+'</td>'
-        +'<td style="color:'+(inf>0?'var(--rd)':'var(--gn)')+';font-weight:'+(inf>0?700:400)+'">'+( inf>0?inf+' infr.':'OK')+'</td>';
+        +'<td style="color:'+(inf>0?'var(--rd)':'var(--gn)')+';font-weight:'+(inf>0?700:400)+'">'+( inf>0?inf+' infr.':'OK')+'</td>'
+        +'<td>'+(r.breakdown&&r.breakdown.length?'<button class="btn bo bsm detail-btn">Details</button>':'—')+'</td>';
+      if(r.breakdown&&r.breakdown.length){
+        tr.querySelector('.detail-btn').onclick=function(){showBreakdown(r);};
+      }
       tb.appendChild(tr);
     });
     t.appendChild(tb);wrap.appendChild(t);return wrap;
+  }
+
+  function showBreakdown(r){
+    var old=document.getElementById('bk-modal');if(old)old.remove();
+    var bg=document.createElement('div');bg.className='mbg';bg.id='bk-modal';
+    bg.onclick=function(e){if(e.target===bg)bg.remove();};
+    var html='<div class="modal" style="max-width:580px;max-height:85vh;overflow-y:auto">'
+      +'<div class="ch mb1"><div><div style="font-weight:700;color:var(--nv)">'+r.studentName+' — '+r.testTitle+'</div>'
+        +'<div style="font-size:.78rem;color:var(--mt)">'+r.classe+' · '+r.date+' · '+(r.pct!=null?r.pct+'%':'—')+'</div>'
+      +'</div><button class="btn bo bsm" id="bk-close">X</button></div>';
+    r.breakdown.forEach(function(b,i){
+      var color=b.ok===true?'#a9dfbf':b.ok===false?'#f5c2be':'#e0dbd2';
+      html+='<div style="border:1.5px solid '+color+';border-radius:10px;padding:.85rem;margin-bottom:.6rem">'
+        +'<div style="font-weight:600;font-size:.88rem;margin-bottom:.5rem">'
+          +(b.ok===true?'✅':b.ok===false?'❌':'📋')+' Q'+(i+1)+' — '+b.q
+        +'</div>';
+      if(b.type==='qcm'&&b.options&&b.options.length){
+        b.options.forEach(function(opt,oi){
+          var isCorrect=oi===b.answer,isGiven=oi===b.given;
+          var bg2=isCorrect?'#eafaf1':isGiven&&!isCorrect?'#fdecea':'var(--cr)';
+          var border2=isCorrect?'#27ae60':isGiven&&!isCorrect?'#c0392b':'var(--bd)';
+          html+='<div style="background:'+bg2+';border:1px solid '+border2+';border-radius:6px;padding:5px 10px;font-size:.82rem;margin-bottom:3px;display:flex;gap:8px">'
+            +(isCorrect?'<span style="color:var(--gn);font-weight:800">✓</span>':isGiven&&!isCorrect?'<span style="color:var(--rd);font-weight:800">✗</span>':'<span style="width:16px"></span>')
+            +opt+'</div>';
+        });
+      }else if(b.type==='vf'){
+        var corrL=b.answer===true?'Vrai':'Faux';
+        var givenL=b.given===true?'Vrai':b.given===false?'Faux':'—';
+        html+='<div style="font-size:.82rem;color:var(--mt)">Reponse : <strong style="color:'+(b.ok?'var(--gn)':'var(--rd)')+'">'+givenL+'</strong> · Correcte : <strong style="color:var(--gn)">'+corrL+'</strong></div>';
+      }else if(b.type==='short'){
+        html+='<div style="font-size:.82rem;color:var(--mt)">Reponse : <strong>'+(b.given||'—')+'</strong>'+(b.expected?' · Attendu : <strong style="color:var(--gn)">'+b.expected+'</strong>':'')+'</div>';
+      }
+      html+='</div>';
+    });
+    html+='</div>';
+    bg.innerHTML=html;
+    document.body.appendChild(bg);
+    document.getElementById('bk-close').onclick=function(){bg.remove();};
   }
 
   function bDocResTable(rows){
