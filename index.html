@@ -326,11 +326,17 @@ function cloudGet(onDone){
         if(cloudHasDocs){SS(K.d,data.docs);}
         else if(localDocs.length>0){cloudPost('saveDocs',localDocs);}
         if(data.results&&data.results.length>0){
-          data.results=data.results.map(function(r){
+          // Fusionner avec les résultats locaux pour préserver les breakdown
+          var localR=SL(K.r,[])||[];
+          var merged=data.results.map(function(r){
             if(r.classe)r.classe=r.classe.toString().replace(/^_/,'').trim();
-            return r;
+            if(r.breakdown)return r;
+            var local=localR.find(function(lr){
+              return lr.breakdown&&lr.studentName===r.studentName&&lr.classe===r.classe&&lr.testTitle===r.testTitle&&lr.date===r.date;
+            });
+            return local?Object.assign({},r,{breakdown:local.breakdown}):r;
           });
-          SS(K.r,data.results);
+          SS(K.r,merged);
         }
         if(data.pin&&data.pin!=='PROF2024'){SS(K.p,data.pin);}
         if(data.master){SS('ek_master',data.master);MASTER=data.master;}
@@ -353,7 +359,16 @@ function cloudGet(onDone){
         if(data&&data.ok){
           if(data.tests&&data.tests.length>0)SS(K.t,data.tests);
           if(data.docs&&data.docs.length>0)SS(K.d,data.docs);
-          if(data.results&&data.results.length>0)SS(K.r,data.results);
+          if(data.results&&data.results.length>0){
+            var localR2=SL(K.r,[])||[];
+            var merged2=data.results.map(function(r){
+              if(r.classe)r.classe=r.classe.toString().replace(/^_/,'').trim();
+              if(r.breakdown)return r;
+              var local2=localR2.find(function(lr){return lr.breakdown&&lr.studentName===r.studentName&&lr.classe===r.classe&&lr.testTitle===r.testTitle&&lr.date===r.date;});
+              return local2?Object.assign({},r,{breakdown:local2.breakdown}):r;
+            });
+            SS(K.r,merged2);
+          }
           if(data.pin)SS(K.p,data.pin);
           syncStatus('Synchronise \u2713',true);
           onDone&&onDone(data);
@@ -975,7 +990,7 @@ function showIdForm(payload,type,onStart){
 /* KIOSK RUNNER */
 function runKiosk(payload,type,student){
   // Sauvegarder l'état kiosk — restauré si l'app se ferme sur iOS
-  SS(K.k,{payload:payload,type:type,student:student,infractions:0,t0:Date.now(),allowResources:!!(payload.allowResources||false)});
+  SS(K.k,{payload:payload,type:type,student:student,infractions:0,t0:Date.now(),allowResources:!!(payload.allowResources||false),showAnswers:payload.showAnswers!==false});
   _liveStudent={name:student.name,classe:student.classe,title:payload.title||'',type:type};
   requestWakeLock();
 
@@ -1341,7 +1356,9 @@ function runExam(container,exam,student,onDone){
     +'</div>';
 
     var rr=document.getElementById('rrows');
-    var showAns=!!(exam&&exam.showAnswers!==false);
+    // Lire showAnswers depuis le kiosk state (source la plus fiable)
+    var ks=SL(K.k,null);
+    var showAns=ks?ks.showAnswers!==false:exam.showAnswers!==false;
     if(showAns){
       breakdown.forEach(function(b,i){
       var row=document.createElement('div');
