@@ -1303,7 +1303,17 @@ function runExam(container,exam,student,onDone){
       var a=answers[q.id],ok=null;
       if(q.type==='qcm'||q.type==='vf')ok=a===q.answer;
       else if(q.type==='short')ok=q.expected?(a||'').trim().toLowerCase()===q.expected.trim().toLowerCase():null;
-      return {q:q.text,type:q.type,options:q.options||[],answer:q.answer,given:a,ok:ok,expected:q.expected||''};
+      else if(q.type==='blanks'){
+        var bl=parseBlanks(q.text||'').filter(function(p){return p.t==='blank';});
+        if(bl.length){var okb=bl.filter(function(b,i){return okBlank(b.v,(a||{})[i]);}).length;ok=okb===bl.length;}
+      }
+      else if(q.type==='match'){
+        var pairs=q.pairs||[];
+        if(pairs.length){var okm=pairs.filter(function(p,pi){return(a||{})[pi]===p.r;}).length;ok=okm===pairs.length;}
+      }
+      return {q:q.text,type:q.type,options:q.options||[],answer:q.answer,given:a,ok:ok,
+              expected:q.expected||'',pairs:q.pairs||[],
+              blanks:parseBlanks(q.text||'').filter(function(p){return p.t==='blank';})};
     });
 
     container.innerHTML='<div style="max-width:640px;margin:0 auto">'
@@ -1357,6 +1367,34 @@ function runExam(container,exam,student,onDone){
       // Réponse courte
       else if(b.type==='short'){
         html+='<div style="font-size:.84rem;color:var(--mt)">Votre réponse : <strong>'+(b.given||'—')+'</strong>'+(b.expected?' — Attendu : <strong style="color:var(--gn)">'+b.expected+'</strong>':'')+'</div>';
+      }
+      // Texte à trous
+      else if(b.type==='blanks'&&b.blanks&&b.blanks.length){
+        html+='<div style="display:flex;flex-direction:column;gap:4px">';
+        b.blanks.forEach(function(bl,bi){
+          var given=(b.given||{})[bi]||'—';
+          var isOk=okBlank(bl.v,given);
+          html+='<div style="font-size:.83rem;background:'+(isOk?'#eafaf1':'#fdecea')+';border:1px solid '+(isOk?'#27ae60':'#c0392b')+';border-radius:6px;padding:5px 10px">'
+            +'Trou '+(bi+1)+' : <strong style="color:'+(isOk?'var(--gn)':'var(--rd)')+'">'+given+'</strong>'
+            +(!isOk?' — Attendu : <strong style="color:var(--gn)">'+bl.v+'</strong>':'')
+          +'</div>';
+        });
+        html+='</div>';
+      }
+      // Correspondances
+      else if(b.type==='match'&&b.pairs&&b.pairs.length){
+        html+='<div style="display:flex;flex-direction:column;gap:4px">';
+        b.pairs.forEach(function(p,pi){
+          var given=(b.given||{})[pi]||'—';
+          var isOk=given===p.r;
+          html+='<div style="font-size:.83rem;background:'+(isOk?'#eafaf1':'#fdecea')+';border:1px solid '+(isOk?'#27ae60':'#c0392b')+';border-radius:6px;padding:5px 10px;display:flex;gap:8px;align-items:center">'
+            +'<span style="font-weight:600">'+p.l+'</span>'
+            +'<span style="color:var(--mt)">→</span>'
+            +'<span style="color:'+(isOk?'var(--gn)':'var(--rd)')+';font-weight:700">'+given+'</span>'
+            +(!isOk?'<span style="color:var(--mt)"> (attendu : <strong style="color:var(--gn)">'+p.r+'</strong>)</span>':'')
+          +'</div>';
+        });
+        html+='</div>';
       }
 
       row.innerHTML=html;
@@ -2055,7 +2093,7 @@ function showTeacher(){
         +'<td style="color:var(--mt)">'+(r.testTitle||'—')+'</td>'
         +'<td>'+(r.abandoned
           ?'<span style="background:#7c3aed;color:#fff;padding:3px 9px;border-radius:20px;font-size:.75rem;font-weight:700">Abandonne</span>'
-          :(r.pct!=null?'<span style="font-weight:700;color:'+(r.pct>=50?'var(--gn)':'var(--rd)')+'">'+r.pct+'%</span><span style="font-size:.76rem;color:var(--mt)"> ('+r.score+'/'+r.max+')</span>':'—'))+'</td>'
+          :(r.pct!=null?'<span style="font-weight:700;color:'+(r.pct>=50?'var(--gn)':'var(--rd)')+'">'+r.pct+'%</span><span style="font-size:.76rem;color:var(--mt)"> ('+String(r.score)+'/'+String(r.max)+')</span>':'—'))+'</td>'
         +'<td style="color:'+(inf>0?'var(--rd)':'var(--gn)')+';font-weight:'+(inf>0?700:400)+'">'+( inf>0?inf+' infr.':'OK')+'</td>'
         +'<td>'+(r.breakdown&&r.breakdown.length?'<button class="btn bo bsm detail-btn">Details</button>':'—')+'</td>';
       if(r.breakdown&&r.breakdown.length){
@@ -2095,6 +2133,25 @@ function showTeacher(){
         html+='<div style="font-size:.82rem;color:var(--mt)">Reponse : <strong style="color:'+(b.ok?'var(--gn)':'var(--rd)')+'">'+givenL+'</strong> · Correcte : <strong style="color:var(--gn)">'+corrL+'</strong></div>';
       }else if(b.type==='short'){
         html+='<div style="font-size:.82rem;color:var(--mt)">Reponse : <strong>'+(b.given||'—')+'</strong>'+(b.expected?' · Attendu : <strong style="color:var(--gn)">'+b.expected+'</strong>':'')+'</div>';
+      }else if(b.type==='blanks'&&b.blanks&&b.blanks.length){
+        b.blanks.forEach(function(bl,bi){
+          var given=(b.given||{})[bi]||'—';
+          var isOk=okBlank(bl.v,given);
+          html+='<div style="font-size:.82rem;background:'+(isOk?'#eafaf1':'#fdecea')+';border:1px solid '+(isOk?'#27ae60':'#c0392b')+';border-radius:6px;padding:5px 10px;margin-bottom:3px">'
+            +'Trou '+(bi+1)+' : <strong style="color:'+(isOk?'var(--gn)':'var(--rd)')+'">'+given+'</strong>'
+            +(!isOk?' · Attendu : <strong style="color:var(--gn)">'+bl.v+'</strong>':'')
+          +'</div>';
+        });
+      }else if(b.type==='match'&&b.pairs&&b.pairs.length){
+        b.pairs.forEach(function(p,pi){
+          var given=(b.given||{})[pi]||'—';
+          var isOk=given===p.r;
+          html+='<div style="font-size:.82rem;background:'+(isOk?'#eafaf1':'#fdecea')+';border:1px solid '+(isOk?'#27ae60':'#c0392b')+';border-radius:6px;padding:5px 10px;margin-bottom:3px;display:flex;gap:8px">'
+            +'<strong>'+p.l+'</strong><span style="color:var(--mt)">→</span>'
+            +'<span style="color:'+(isOk?'var(--gn)':'var(--rd)')+';font-weight:700">'+given+'</span>'
+            +(!isOk?'<span style="color:var(--mt)">(attendu : <strong style="color:var(--gn)">'+p.r+'</strong>)</span>':'')
+          +'</div>';
+        });
       }
       html+='</div>';
     });
