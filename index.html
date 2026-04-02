@@ -926,47 +926,40 @@ function runKiosk(payload,type,student){
   function showResources(){
     var resources=SL(K.res,[]);
     if(!resources.length)return;
-    var oldOv=document.getElementById('res-overlay');if(oldOv)oldOv.remove();
-    var ov=document.createElement('div');
-    ov.id='res-overlay';
-    ov.style.cssText='position:fixed;inset:0;background:#06061a;z-index:9990;display:flex;flex-direction:column;';
-    var tabs=resources.map(function(r,i){
-      return '<button class="res-tab" data-url="'+r.url+'" style="padding:8px 16px;border:none;border-bottom:2px solid '+(i===0?'var(--gd)':'transparent')+';background:transparent;color:'+(i===0?'#fff':'rgba(255,255,255,.5)')+';cursor:pointer;font-size:.82rem;font-weight:600;white-space:nowrap">'+r.name+'</button>';
-    }).join('');
-    ov.innerHTML='<div style="background:#0f2044;display:flex;align-items:center;gap:0;border-bottom:1px solid rgba(255,255,255,.1);overflow-x:auto">'
-      +tabs
-      +'<button id="res-close" style="margin-left:auto;padding:8px 16px;border:none;background:rgba(255,80,80,.2);color:#ffaaaa;cursor:pointer;font-size:.82rem;flex-shrink:0">&#10005; Fermer</button>'
-    +'</div>'
-    +'<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;color:#fff;text-align:center;padding:2rem">'
-      +'<div style="font-size:3rem">&#128218;</div>'
-      +'<div id="res-sitename" style="font-weight:800;font-size:1.3rem">'+resources[0].name+'</div>'
-      +'<div style="font-size:.87rem;opacity:.7;max-width:340px;line-height:1.6">Cliquez pour ouvrir le site dans un nouvel onglet.<br>Revenez sur cette page apres votre recherche.<br><strong style=\'color:var(--gd)\'>Aucune infraction ne sera comptee.</strong></div>'
-      +'<button id="res-open" style="background:var(--gd);color:var(--nv);border:none;padding:14px 32px;border-radius:12px;cursor:pointer;font-size:1rem;font-weight:800;display:flex;align-items:center;gap:8px">&#128214; Ouvrir le site</button>'
-      +'<div id="res-url-display" style="font-size:.75rem;opacity:.4">'+resources[0].url+'</div>'
-    +'</div>';
-    document.body.appendChild(ov);
-
-    var currentUrl=resources[0].url;
-    var currentName=resources[0].name;
-
-    function updateDisplay(){
-      var sn=document.getElementById('res-sitename');
-      var ud=document.getElementById('res-url-display');
-      if(sn)sn.textContent=currentName;
-      if(ud)ud.textContent=currentUrl;
-      var op=document.getElementById('res-open');
-      if(op)op.onclick=function(){window.open(currentUrl,'_blank');};
+    // Toggle : si déjà ouvert, fermer
+    var existing=document.getElementById('res-panel');
+    if(existing){_resourcesOpen=false;existing.remove();
+      var kb=document.getElementById('kbody');if(kb)kb.style.width='';
+      return;
     }
-    updateDisplay();
+    // Panneau latéral droit
+    var panel=document.createElement('div');
+    panel.id='res-panel';
+    panel.style.cssText='position:fixed;top:0;right:0;width:42%;max-width:520px;min-width:300px;height:100%;background:#fff;z-index:9990;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.35);transition:transform .25s ease;';
+    // Réduire le document principal
+    var kb=document.getElementById('kbody');if(kb)kb.style.cssText+='width:58%;min-width:0;';
+    var tabs=resources.map(function(r,i){
+      return '<button class="res-tab" data-url="'+r.url+'" style="padding:7px 14px;border:none;border-bottom:2px solid '+(i===0?'var(--gd)':'transparent')+';background:transparent;color:'+(i===0?'#fff':'rgba(255,255,255,.6)')+';cursor:pointer;font-size:.78rem;font-weight:600;white-space:nowrap;flex-shrink:0">'+r.name+'</button>';
+    }).join('');
+    panel.innerHTML=
+      '<div style="background:#0f2044;display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.1);overflow-x:auto;flex-shrink:0">'
+        +tabs
+        +'<button id="res-close" style="margin-left:auto;padding:7px 12px;border:none;background:rgba(255,80,80,.2);color:#ffaaaa;cursor:pointer;font-size:.8rem;flex-shrink:0;font-weight:700">&#10005;</button>'
+      +'</div>'
+      +'<iframe id="res-iframe" src="'+resources[0].url+'" style="flex:1;border:none;width:100%;display:block;" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>';
+    document.body.appendChild(panel);
+    _resourcesOpen=true;
 
-    document.getElementById('res-close').onclick=function(){_resourcesOpen=false;ov.remove();};
-    ov.querySelectorAll('.res-tab').forEach(function(btn){
+    document.getElementById('res-close').onclick=function(){
+      _resourcesOpen=false;panel.remove();
+      var kb2=document.getElementById('kbody');if(kb2)kb2.style.width='';
+    };
+    panel.querySelectorAll('.res-tab').forEach(function(btn){
       btn.onclick=function(){
-        ov.querySelectorAll('.res-tab').forEach(function(b){b.style.borderBottomColor='transparent';b.style.color='rgba(255,255,255,.5)';});
+        panel.querySelectorAll('.res-tab').forEach(function(b){b.style.borderBottomColor='transparent';b.style.color='rgba(255,255,255,.6)';});
         btn.style.borderBottomColor='var(--gd)';btn.style.color='#fff';
-        currentUrl=btn.dataset.url;
-        currentName=btn.textContent;
-        updateDisplay();
+        var iframe=document.getElementById('res-iframe');
+        if(iframe)iframe.src=btn.dataset.url;
       };
     });
   }
