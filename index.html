@@ -1466,6 +1466,7 @@ function showShareModal(type,item){
 /* TEACHER */
 function showTeacher(){
   var tests=SL(K.t,[]),docs=SL(K.d,[]),results=SL(K.r,[]),view='home',creating=null;
+  var _sessOpts={}; // stocke les options par test id : {showAnswers, allowRes}
   function svT(){SS(K.t,tests);cloudPost('saveTests',tests);}
   function svD(){SS(K.d,docs);cloudPost('saveDocs',docs);}
 
@@ -1782,10 +1783,11 @@ function showTeacher(){
     tests.forEach(function(t){
       var d=document.createElement('div');d.className='card';
       var resources=SL(K.res,[]);
+      var opts=_sessOpts[t.id]||{showAnswers:true,allowRes:false};
       var resCheck=resources.length
-        ?'<label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--mt);cursor:pointer;margin-top:6px"><input type="checkbox" class="res-chk" style="accent-color:var(--nv);cursor:pointer"> &#128218; Ressources autorisees</label>'
+        ?'<label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--mt);cursor:pointer;margin-top:6px"><input type="checkbox" class="res-chk" '+(opts.allowRes?'checked':'')+' style="accent-color:var(--nv);cursor:pointer"> &#128218; Ressources autorisees</label>'
         :'';
-      var ansCheck='<label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--mt);cursor:pointer;margin-top:6px"><input type="checkbox" class="ans-chk" checked style="accent-color:var(--nv);cursor:pointer"> &#128065; Afficher les reponses aux eleves</label>';
+      var ansCheck='<label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--mt);cursor:pointer;margin-top:6px"><input type="checkbox" class="ans-chk" '+(opts.showAnswers!==false?'checked':'')+' style="accent-color:var(--nv);cursor:pointer"> &#128065; Afficher les reponses aux eleves</label>';
       d.innerHTML='<div><div class="ch" style="margin-bottom:4px"><div><div class="ct">'+t.title+'</div><div class="cm">'+t.subject+' · '+t.duration+'min · '+t.questions.length+'q'+(t.shuffle?' · <span style="color:#6d4aff;font-weight:700">Q.aleatoires</span>':'')+(t.noBack?' · <span style="color:var(--rd);font-weight:700">sans retour</span>':'')+'</div><div style="font-size:.74rem;color:var(--mt);margin-top:4px">'+results.filter(function(r){return r.testId===t.id;}).length+' resultat(s)</div></div><div class="row" style="gap:7px;flex-wrap:wrap"><button class="btn bk bsm" data-a="sess" data-id="'+t.id+'">&#9654; Demarrer session</button><span class="bdg '+(t.active?'b-gn':'b-rd')+'">'+(t.active?'Actif':'Inactif')+'</span><button class="btn bn bsm" data-a="xml" data-id="'+t.id+'">XML</button><button class="btn bo bsm" data-a="tog" data-id="'+t.id+'">'+(t.active?'Desactiver':'Activer')+'</button><button class="btn br bsm" data-a="del" data-id="'+t.id+'">X</button></div></div>'
         +ansCheck
         +resCheck
@@ -1801,6 +1803,11 @@ function showTeacher(){
         else if(b.dataset.a==='tog'){tests=tests.map(function(x){return x.id===id?Object.assign({},x,{active:!x.active}):x;});svT();bMain();}
         else if(b.dataset.a==='del'){customConfirm('Supprimer le test "'+t2.title+'" ?',function(){tests=tests.filter(function(x){return x.id!==id;});svT();bMain();});}
       };});
+      // Persister l'état des checkboxes
+      var achkEl=d.querySelector('.ans-chk');
+      var rchkEl=d.querySelector('.res-chk');
+      if(achkEl)achkEl.onchange=function(){_sessOpts[t.id]=_sessOpts[t.id]||{};_sessOpts[t.id].showAnswers=achkEl.checked;};
+      if(rchkEl)rchkEl.onchange=function(){_sessOpts[t.id]=_sessOpts[t.id]||{};_sessOpts[t.id].allowRes=rchkEl.checked;};
       mn.appendChild(d);
     });
   }
@@ -2091,11 +2098,21 @@ function showTeacher(){
   }
 
   function bTestResTable(rows){
+    // Fusionner avec les résultats locaux pour récupérer le breakdown
+    var localResults=SL(K.r,[]);
+    var mergedRows=rows.map(function(r){
+      if(r.breakdown)return r;
+      // Chercher le résultat local correspondant
+      var local=localResults.find(function(lr){
+        return lr.breakdown&&lr.studentName===r.studentName&&lr.classe===r.classe&&lr.testTitle===r.testTitle&&lr.date===r.date;
+      });
+      return local?Object.assign({},r,{breakdown:local.breakdown}):r;
+    });
     var wrap=document.createElement('div');wrap.className='tbl';
     var t=document.createElement('table');
     t.innerHTML='<thead><tr><th>Date</th><th>Eleve</th><th>Classe</th><th>Test</th><th>Score</th><th>Infractions</th><th></th></tr></thead>';
     var tb=document.createElement('tbody');
-    rows.forEach(function(r){
+    mergedRows.forEach(function(r){
       var tr=document.createElement('tr');var inf=r.infractions||0;
       tr.innerHTML='<td style="color:var(--mt);font-size:.78rem">'+(r.date||'—')+'</td>'
         +'<td style="font-weight:600">'+(r.studentName||'')+'</td>'
