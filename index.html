@@ -245,7 +245,8 @@ function saveSessionToCloud(sess, onDone){
     subject:sess.subject,
     exitPin:sess.exitPin,
     created:sess.created,
-    active:sess.active
+    active:sess.active,
+    allowResources:!!sess.allowResources
   };
   // Pour les documents texte, inclure le contenu directement (sinon l'élève ne peut pas l'afficher)
   if(sess.type==='doc'&&sess.data&&sess.data.docType==='text'){
@@ -764,7 +765,8 @@ function showLogin(){
     var sess=getSession(code);
     if(sess&&sess.active){
       btn.disabled=false;if(loading)loading.style.display='none';
-      runKiosk(sess.data,sess.type,{name:name,classe:cl});
+      var localData=Object.assign({},sess.data,{allowResources:!!sess.allowResources});
+      runKiosk(localData,sess.type,{name:name,classe:cl});
       return;
     }
 
