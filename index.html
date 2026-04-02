@@ -562,6 +562,34 @@ function exportXML(test){
   return x+'</quiz>';
 }
 
+function exportTestXLS(test){
+  var rows=results.filter(function(r){return r.testId===test.id;});
+  if(!rows.length){alert('Aucun résultat pour ce test.');return;}
+  var xml='<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>'
+    +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
+    +'<Styles><Style ss:ID="H"><Font ss:Bold="1"/><Interior ss:Color="#0F2044" ss:Pattern="Solid"/><Font ss:Color="#FFFFFF" ss:Bold="1"/></Style></Styles>'
+    +'<Worksheet ss:Name="'+test.title.replace(/[<>&"]/g,'')+'"><Table>'
+    +'<Row ss:StyleID="H"><Cell><Data ss:Type="String">Date</Data></Cell><Cell><Data ss:Type="String">Eleve</Data></Cell>'
+    +'<Cell><Data ss:Type="String">Classe</Data></Cell><Cell><Data ss:Type="String">Score %</Data></Cell>'
+    +'<Cell><Data ss:Type="String">Score</Data></Cell><Cell><Data ss:Type="String">Infractions</Data></Cell>'
+    +'<Cell><Data ss:Type="String">Statut</Data></Cell></Row>';
+  rows.forEach(function(r){
+    var cl=String(r.classe||'').replace(/^_/,'');
+    xml+='<Row><Cell><Data ss:Type="String">'+(r.date||'')+'</Data></Cell>'
+      +'<Cell><Data ss:Type="String">'+(r.studentName||'')+'</Data></Cell>'
+      +'<Cell><Data ss:Type="String">'+cl+'</Data></Cell>'
+      +'<Cell><Data ss:Type="Number">'+(r.pct!=null?r.pct:0)+'</Data></Cell>'
+      +'<Cell><Data ss:Type="String">'+(r.score!=null?r.score+'/'+r.max:'—')+'</Data></Cell>'
+      +'<Cell><Data ss:Type="Number">'+(r.infractions||0)+'</Data></Cell>'
+      +'<Cell><Data ss:Type="String">'+(r.abandoned?'Abandonne':'Termine')+'</Data></Cell></Row>';
+  });
+  xml+='</Table></Worksheet></Workbook>';
+  var b=new Blob([xml],{type:'application/vnd.ms-excel'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download=test.title.replace(/\s+/g,'_')+'_resultats.xls';
+  a.click();
+}
+
 function dlXML(test){
   var b=new Blob([exportXML(test)],{type:'application/xml'});
   var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=(test.title||'test').replace(/[^a-z0-9]/gi,'_')+'.xml';a.click();URL.revokeObjectURL(a.href);
@@ -610,6 +638,7 @@ function calcScore(questions,answers){
 
 /* WAKE LOCK — empêche la mise en veille pendant une session kiosk */
 var _wakeLock=null;
+var _showAnswers=true; // contrôle l'affichage des réponses côté élève
 
 function requestWakeLock(){
   if('wakeLock' in navigator){
@@ -992,6 +1021,7 @@ function runKiosk(payload,type,student){
   // Sauvegarder l'état kiosk — restauré si l'app se ferme sur iOS
   SS(K.k,{payload:payload,type:type,student:student,infractions:0,t0:Date.now(),allowResources:!!(payload.allowResources||false),showAnswers:payload.showAnswers!==false});
   SS('ek_show_ans', payload.showAnswers===false?'0':'1');
+  _showAnswers = payload.showAnswers!==false; // variable globale directe
   _liveStudent={name:student.name,classe:student.classe,title:payload.title||'',type:type};
   requestWakeLock();
 
@@ -1359,7 +1389,7 @@ function runExam(container,exam,student,onDone){
     +'</div>';
 
     var rr=document.getElementById('rrows');
-    var showAns=SL('ek_show_ans','1')==='1';
+    var showAns=_showAnswers; // variable globale directe - 100% fiable
     if(showAns){
       breakdown.forEach(function(b,i){
       var row=document.createElement('div');
@@ -1806,7 +1836,7 @@ function showTeacher(){
         ?'<label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--mt);cursor:pointer;margin-top:6px"><input type="checkbox" class="res-chk" '+(opts.allowRes?'checked':'')+' style="accent-color:var(--nv);cursor:pointer"> &#128218; Ressources autorisees</label>'
         :'';
       var ansCheck='<label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--mt);cursor:pointer;margin-top:6px"><input type="checkbox" class="ans-chk" '+(opts.showAnswers!==false?'checked':'')+' style="accent-color:var(--nv);cursor:pointer"> &#128065; Afficher les reponses aux eleves</label>';
-      d.innerHTML='<div><div class="ch" style="margin-bottom:4px"><div><div class="ct">'+t.title+'</div><div class="cm">'+t.subject+' · '+t.duration+'min · '+t.questions.length+'q'+(t.shuffle?' · <span style="color:#6d4aff;font-weight:700">Q.aleatoires</span>':'')+(t.noBack?' · <span style="color:var(--rd);font-weight:700">sans retour</span>':'')+'</div><div style="font-size:.74rem;color:var(--mt);margin-top:4px">'+results.filter(function(r){return r.testId===t.id;}).length+' resultat(s)</div></div><div class="row" style="gap:7px;flex-wrap:wrap"><button class="btn bk bsm" data-a="sess" data-id="'+t.id+'">&#9654; Demarrer session</button><span class="bdg '+(t.active?'b-gn':'b-rd')+'">'+(t.active?'Actif':'Inactif')+'</span><button class="btn bn bsm" data-a="xml" data-id="'+t.id+'">XML</button><button class="btn bo bsm" data-a="tog" data-id="'+t.id+'">'+(t.active?'Desactiver':'Activer')+'</button><button class="btn br bsm" data-a="del" data-id="'+t.id+'">X</button></div></div>'
+      d.innerHTML='<div><div class="ch" style="margin-bottom:4px"><div><div class="ct">'+t.title+'</div><div class="cm">'+t.subject+' · '+t.duration+'min · '+t.questions.length+'q'+(t.shuffle?' · <span style="color:#6d4aff;font-weight:700">Q.aleatoires</span>':'')+(t.noBack?' · <span style="color:var(--rd);font-weight:700">sans retour</span>':'')+'</div><div style="font-size:.74rem;color:var(--mt);margin-top:4px">'+results.filter(function(r){return r.testId===t.id;}).length+' resultat(s)</div></div><div class="row" style="gap:7px;flex-wrap:wrap"><button class="btn bk bsm" data-a="sess" data-id="'+t.id+'">&#9654; Demarrer session</button><span class="bdg '+(t.active?'b-gn':'b-rd')+'">'+(t.active?'Actif':'Inactif')+'</span><button class="btn bn bsm" data-a="xml" data-id="'+t.id+'">XML</button><button class="btn bo bsm" data-a="tog" data-id="'+t.id+'">'+(t.active?'Desactiver':'Activer')+'</button><button class="btn bg bsm" data-a="xls" data-id="'+t.id+'">&#128190; Excel</button><button class="btn br bsm" data-a="clr" data-id="'+t.id+'">&#128465;</button><button class="btn br bsm" data-a="del" data-id="'+t.id+'">X</button></div></div>'
         +ansCheck
         +resCheck
       +'</div>';
@@ -1817,6 +1847,15 @@ function showTeacher(){
           var chk=d.querySelector('.res-chk');
           var achk=d.querySelector('.ans-chk');
           showSessionModal('exam',t2,chk&&chk.checked,achk?achk.checked:true);
+        }
+        else if(b.dataset.a==='xls')exportTestXLS(t2);
+        else if(b.dataset.a==='clr'){
+          customConfirm('Effacer tous les résultats de "'+t2.title+'" ?',function(){
+            results=results.filter(function(r){return r.testId!==t2.id;});
+            SS(K.r,results);
+            cloudPost('saveResults',results);
+            bMain();
+          });
         }
         else if(b.dataset.a==='tog'){tests=tests.map(function(x){return x.id===id?Object.assign({},x,{active:!x.active}):x;});svT();bMain();}
         else if(b.dataset.a==='del'){customConfirm('Supprimer le test "'+t2.title+'" ?',function(){tests=tests.filter(function(x){return x.id!==id;});svT();bMain();});}
