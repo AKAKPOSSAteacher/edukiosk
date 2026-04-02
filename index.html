@@ -1311,10 +1311,13 @@ function runExam(container,exam,student,onDone){
         var pairs=q.pairs||[];
         if(pairs.length){var okm=pairs.filter(function(p,pi){return(a||{})[pi]===p.r;}).length;ok=okm===pairs.length;}
       }
-      return {q:q.text,type:q.type,options:q.options||[],answer:q.answer,given:a,ok:ok,
-              expected:q.expected||'',pairs:q.pairs||[],
-              blanks:parseBlanks(q.text||'').filter(function(p){return p.t==='blank';})};
-    });
+      return {
+        q:String(q.text||''),type:q.type,
+        options:(q.options||[]).map(String),
+        answer:q.answer,given:a,ok:ok,
+        expected:String(q.expected||''),
+        pairs:(q.pairs||[]).map(function(p){return {l:String(p.l||''),r:String(p.r||'')};}),
+        blanks:q.type==='blanks'?parseBlanks(q.text||'').filter(function(p){return p.t==='blank';}).map(function(p){return {v:String(p.v||'')};}):[]};    });
 
     container.innerHTML='<div style="max-width:640px;margin:0 auto">'
       +'<div style="background:'+(sc.pct>=50?'var(--gn)':'var(--rd)')+';color:#fff;padding:1.1rem 1.5rem;border-radius:var(--r) var(--r) 0 0;text-align:center">'
@@ -1408,13 +1411,22 @@ function runExam(container,exam,student,onDone){
     }
 
     var rb=document.getElementById('rbtn');if(rb)rb.onclick=function(){
+      // Simplifier le breakdown pour éviter les problèmes de sérialisation
+      var cleanBreakdown=breakdown.map(function(b){
+        return {
+          q:b.q,type:b.type,ok:b.ok,given:b.given,answer:b.answer,
+          options:b.options||[],expected:b.expected||'',
+          pairs:(b.pairs||[]).map(function(p){return {l:p.l,r:p.r};}),
+          blanks:(b.blanks||[]).map(function(bl){return {v:bl.v};})
+        };
+      });
       onDone({
         score:sc.score,max:sc.max,pct:sc.pct,manual:sc.manual,
         infractions:_infractions,
         studentName:student.name,classe:student.classe,
         testId:exam.id,testTitle:exam.title,subject:exam.subject,
         date:new Date().toLocaleDateString('fr-FR'),
-        breakdown:breakdown
+        breakdown:cleanBreakdown
       });
     };
   }
