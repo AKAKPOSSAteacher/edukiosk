@@ -1075,14 +1075,20 @@ function runKiosk(payload,type,student){
 
   startAC(showLock,showSS,type==='doc');
 
-  function finish(result){
+  function finish(cloudResult,localResult){
     stopAC();
     releaseWakeLock();
     _liveStudent=null;
-    SS(K.k,null); // effacer l'état kiosk
-    if(result){
-      var all=[].concat(SL(K.r,[]));all.push(result);SS(K.r,all);
-      cloudPost('saveResult',result);
+    SS(K.k,null);
+    var r=localResult||cloudResult;
+    if(r){
+      var all=[].concat(SL(K.r,[]));all.push(r);
+      try{SS(K.r,all);}catch(e){
+        // Si trop grand, sauvegarder sans breakdown
+        var r2=Object.assign({},r);delete r2.breakdown;
+        var all2=[].concat(SL(K.r,[]));all2.push(r2);SS(K.r,all2);
+      }
+      if(cloudResult)cloudPost('saveResult',cloudResult);
     }
     showDone();
   }
@@ -1411,23 +1417,23 @@ function runExam(container,exam,student,onDone){
     }
 
     var rb=document.getElementById('rbtn');if(rb)rb.onclick=function(){
-      // Simplifier le breakdown pour éviter les problèmes de sérialisation
       var cleanBreakdown=breakdown.map(function(b){
-        return {
-          q:b.q,type:b.type,ok:b.ok,given:b.given,answer:b.answer,
-          options:b.options||[],expected:b.expected||'',
-          pairs:(b.pairs||[]).map(function(p){return {l:p.l,r:p.r};}),
-          blanks:(b.blanks||[]).map(function(bl){return {v:bl.v};})
-        };
+        return {q:b.q,type:b.type,ok:b.ok,given:b.given,answer:b.answer,
+                options:b.options||[],expected:b.expected||'',
+                pairs:(b.pairs||[]).map(function(p){return {l:p.l,r:p.r};}),
+                blanks:(b.blanks||[]).map(function(bl){return {v:bl.v};})};
       });
-      onDone({
+      // Résultat léger pour le cloud (sans breakdown)
+      var cloudResult={
         score:sc.score,max:sc.max,pct:sc.pct,manual:sc.manual,
         infractions:_infractions,
         studentName:student.name,classe:student.classe,
         testId:exam.id,testTitle:exam.title,subject:exam.subject,
-        date:new Date().toLocaleDateString('fr-FR'),
-        breakdown:cleanBreakdown
-      });
+        date:new Date().toLocaleDateString('fr-FR')
+      };
+      // Résultat complet pour localStorage (avec breakdown)
+      var localResult=Object.assign({},cloudResult,{breakdown:cleanBreakdown});
+      onDone(cloudResult,localResult);
     };
   }
 
