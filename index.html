@@ -838,7 +838,7 @@ function showLogin(){
     if(sess&&sess.active){
       btn.disabled=false;if(loading)loading.style.display='none';
       if(sess.resources&&sess.resources.length)SS(K.res,sess.resources);
-      var localData=Object.assign({},sess.data,{allowResources:!!sess.allowResources});
+      var localData=Object.assign({},sess.data,{allowResources:!!sess.allowResources,showAnswers:sess.showAnswers!==false});
       runKiosk(localData,sess.type,{name:name,classe:cl});
       return;
     }
@@ -898,7 +898,7 @@ function showLogin(){
         }
         var sessions=SL(K.s,{});sessions[code]=sess;SS(K.s,sessions);
         // Passer allowResources dans le payload
-        var finalData=Object.assign({},sess.data,{allowResources:!!sess.allowResources});
+        var finalData=Object.assign({},sess.data,{allowResources:!!sess.allowResources,showAnswers:sess.showAnswers!==false});
         runKiosk(finalData,sess.type,{name:name,classe:cl});
       }else if(data&&data.session&&!data.session.active){
         showErr('Cette session est terminee.');
@@ -1332,7 +1332,9 @@ function runExam(container,exam,student,onDone){
     +'</div>';
 
     var rr=document.getElementById('rrows');
-    breakdown.forEach(function(b,i){
+    var showAns=!!(payload&&payload.showAnswers!==false);
+    if(showAns){
+      breakdown.forEach(function(b,i){
       var row=document.createElement('div');
       row.style.cssText='background:var(--sf);border:1.5px solid '+(b.ok===true?'#a9dfbf':b.ok===false?'#f5c2be':'#e0dbd2')+';border-radius:10px;padding:.9rem;margin-bottom:.7rem;';
 
@@ -1400,6 +1402,10 @@ function runExam(container,exam,student,onDone){
       row.innerHTML=html;
       if(rr)rr.appendChild(row);
     });
+    }else if(rr){
+      // Sans détails — juste un message neutre
+      rr.innerHTML='<div style="background:var(--cr);border-radius:8px;padding:.85rem 1rem;font-size:.84rem;color:var(--mt);text-align:center;margin-bottom:.5rem">Les corrections seront communiquees par votre professeur.</div>';
+    }
 
     var rb=document.getElementById('rbtn');if(rb)rb.onclick=function(){
       onDone({
@@ -1658,7 +1664,8 @@ function showTeacher(){
     };
   }
 
-  function showSessionModal(type, item, allowRes){
+  function showSessionModal(type, item, allowRes, showAnswers){
+    if(showAnswers===undefined)showAnswers=true;
     var code=genCode();
     var exitPin=genCode().slice(0,4);
     var sess={
@@ -1671,6 +1678,8 @@ function showTeacher(){
       created:Date.now(),
       active:true,
       allowResources:!!allowRes,
+      showAnswers:!!showAnswers,
+      resources:allowRes?SL(K.res,[]):[],
       data:type==='doc'?Object.assign({},item,{exitPin:exitPin}):item
     };
 
@@ -1758,7 +1767,8 @@ function showTeacher(){
       var resCheck=resources.length
         ?'<label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--mt);cursor:pointer;margin-top:6px"><input type="checkbox" class="res-chk" style="accent-color:var(--nv);cursor:pointer"> &#128218; Ressources autorisees</label>'
         :'';
-      d.innerHTML='<div><div class="ch" style="margin-bottom:'+(resCheck?'4px':'.9rem')+'"><div><div class="ct">'+t.title+'</div><div class="cm">'+t.subject+' · '+t.duration+'min · '+t.questions.length+'q'+(t.shuffle?' · <span style="color:#6d4aff;font-weight:700">Q.aleatoires</span>':'')+(t.noBack?' · <span style="color:var(--rd);font-weight:700">sans retour</span>':'')+'</div><div style="font-size:.74rem;color:var(--mt);margin-top:4px">'+results.filter(function(r){return r.testId===t.id;}).length+' resultat(s)</div></div><div class="row" style="gap:7px;flex-wrap:wrap"><button class="btn bk bsm" data-a="sess" data-id="'+t.id+'">&#9654; Demarrer session</button><span class="bdg '+(t.active?'b-gn':'b-rd')+'">'+(t.active?'Actif':'Inactif')+'</span><button class="btn bn bsm" data-a="xml" data-id="'+t.id+'">XML</button><button class="btn bo bsm" data-a="tog" data-id="'+t.id+'">'+(t.active?'Desactiver':'Activer')+'</button><button class="btn br bsm" data-a="del" data-id="'+t.id+'">X</button></div></div>'
+      d.innerHTML='<div><div class="ch" style="margin-bottom:4px"><div><div class="ct">'+t.title+'</div><div class="cm">'+t.subject+' · '+t.duration+'min · '+t.questions.length+'q'+(t.shuffle?' · <span style="color:#6d4aff;font-weight:700">Q.aleatoires</span>':'')+(t.noBack?' · <span style="color:var(--rd);font-weight:700">sans retour</span>':'')+'</div><div style="font-size:.74rem;color:var(--mt);margin-top:4px">'+results.filter(function(r){return r.testId===t.id;}).length+' resultat(s)</div></div><div class="row" style="gap:7px;flex-wrap:wrap"><button class="btn bk bsm" data-a="sess" data-id="'+t.id+'">&#9654; Demarrer session</button><span class="bdg '+(t.active?'b-gn':'b-rd')+'">'+(t.active?'Actif':'Inactif')+'</span><button class="btn bn bsm" data-a="xml" data-id="'+t.id+'">XML</button><button class="btn bo bsm" data-a="tog" data-id="'+t.id+'">'+(t.active?'Desactiver':'Activer')+'</button><button class="btn br bsm" data-a="del" data-id="'+t.id+'">X</button></div></div>'
+        +ansCheck
         +resCheck
       +'</div>';
       d.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){
@@ -1766,7 +1776,8 @@ function showTeacher(){
         if(b.dataset.a==='xml')dlXML(t2);
         else if(b.dataset.a==='sess'){
           var chk=d.querySelector('.res-chk');
-          showSessionModal('exam',t2,chk&&chk.checked);
+          var achk=d.querySelector('.ans-chk');
+          showSessionModal('exam',t2,chk&&chk.checked,achk?achk.checked:true);
         }
         else if(b.dataset.a==='tog'){tests=tests.map(function(x){return x.id===id?Object.assign({},x,{active:!x.active}):x;});svT();bMain();}
         else if(b.dataset.a==='del'){customConfirm('Supprimer le test "'+t2.title+'" ?',function(){tests=tests.filter(function(x){return x.id!==id;});svT();bMain();});}
@@ -2093,7 +2104,7 @@ function showTeacher(){
         +'<td style="color:var(--mt)">'+(r.testTitle||'—')+'</td>'
         +'<td>'+(r.abandoned
           ?'<span style="background:#7c3aed;color:#fff;padding:3px 9px;border-radius:20px;font-size:.75rem;font-weight:700">Abandonne</span>'
-          :(r.pct!=null?'<span style="font-weight:700;color:'+(r.pct>=50?'var(--gn)':'var(--rd)')+'">'+r.pct+'%</span><span style="font-size:.76rem;color:var(--mt)"> ('+String(r.score)+'/'+String(r.max)+')</span>':'—'))+'</td>'
+          :(r.pct!=null?'<span style="font-weight:700;color:'+(r.pct>=50?'var(--gn)':'var(--rd)')+'">'+r.pct+'%</span><span style="font-size:.76rem;color:var(--mt)"> ('+(isNaN(Number(r.score))||r.score===null?'—':r.score)+'/'+(isNaN(Number(r.max))||r.max===undefined?'—':r.max)+')</span>':'—'))+'</td>'
         +'<td style="color:'+(inf>0?'var(--rd)':'var(--gn)')+';font-weight:'+(inf>0?700:400)+'">'+( inf>0?inf+' infr.':'OK')+'</td>'
         +'<td>'+(r.breakdown&&r.breakdown.length?'<button class="btn bo bsm detail-btn">Details</button>':'—')+'</td>';
       if(r.breakdown&&r.breakdown.length){
