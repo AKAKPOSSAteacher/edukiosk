@@ -246,7 +246,8 @@ function saveSessionToCloud(sess, onDone){
     exitPin:sess.exitPin,
     created:sess.created,
     active:sess.active,
-    allowResources:!!sess.allowResources
+    allowResources:!!sess.allowResources,
+    resources:sess.allowResources?SL(K.res,[]):[]
   };
   // Pour les documents texte, inclure le contenu directement (sinon l'élève ne peut pas l'afficher)
   if(sess.type==='doc'&&sess.data&&sess.data.docType==='text'){
@@ -765,6 +766,7 @@ function showLogin(){
     var sess=getSession(code);
     if(sess&&sess.active){
       btn.disabled=false;if(loading)loading.style.display='none';
+      if(sess.resources&&sess.resources.length)SS(K.res,sess.resources);
       var localData=Object.assign({},sess.data,{allowResources:!!sess.allowResources});
       runKiosk(localData,sess.type,{name:name,classe:cl});
       return;
@@ -801,6 +803,8 @@ function showLogin(){
       btn.disabled=false;if(loading)loading.style.display='none';
       if(data&&data.ok&&data.session&&data.session.active){
         var sess=data.session;
+        // Stocker les ressources de la session sur cet appareil
+        if(sess.resources&&sess.resources.length)SS(K.res,sess.resources);
         // Si la session contient déjà les données complètes, les utiliser directement
         if(!sess.data&&sess.activityId){
           var localTests=SL(K.t,[]);
