@@ -1335,7 +1335,7 @@ function runExam(container,exam,student,onDone){
     +'</div>';
 
     var rr=document.getElementById('rrows');
-    var showAns=!!(payload&&payload.showAnswers!==false);
+    var showAns=!!(exam&&exam.showAnswers!==false);
     if(showAns){
       breakdown.forEach(function(b,i){
       var row=document.createElement('div');
