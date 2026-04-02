@@ -563,31 +563,62 @@ function exportXML(test){
 }
 
 function exportTestXLS(test){
-  var rows=results.filter(function(r){return r.testId===test.id;});
-  if(!rows.length){alert('Aucun résultat pour ce test.');return;}
+  var rows=results.filter(function(r){return r.testTitle===test.title||r.testId===test.id;});
+  if(!rows.length){alert('Aucun résultat pour "'+test.title+'". Synchronisez d\'abord.');return;}
   var xml='<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>'
     +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
-    +'<Styles><Style ss:ID="H"><Font ss:Bold="1"/><Interior ss:Color="#0F2044" ss:Pattern="Solid"/><Font ss:Color="#FFFFFF" ss:Bold="1"/></Style></Styles>'
-    +'<Worksheet ss:Name="'+test.title.replace(/[<>&"]/g,'')+'"><Table>'
+    +'<Styles><Style ss:ID="H"><Font ss:Bold="1"/><Interior ss:Color="#0F2044" ss:Pattern="Solid"/><Font ss:Color="#FFFFFF" ss:Bold="1"/></Style>'
+    +'<Style ss:ID="G"><Interior ss:Color="#EAFAF1" ss:Pattern="Solid"/></Style>'
+    +'<Style ss:ID="R"><Interior ss:Color="#FDECEA" ss:Pattern="Solid"/></Style></Styles>'
+    +'<Worksheet ss:Name="Resultats"><Table>'
     +'<Row ss:StyleID="H"><Cell><Data ss:Type="String">Date</Data></Cell><Cell><Data ss:Type="String">Eleve</Data></Cell>'
     +'<Cell><Data ss:Type="String">Classe</Data></Cell><Cell><Data ss:Type="String">Score %</Data></Cell>'
     +'<Cell><Data ss:Type="String">Score</Data></Cell><Cell><Data ss:Type="String">Infractions</Data></Cell>'
     +'<Cell><Data ss:Type="String">Statut</Data></Cell></Row>';
   rows.forEach(function(r){
     var cl=String(r.classe||'').replace(/^_/,'');
-    xml+='<Row><Cell><Data ss:Type="String">'+(r.date||'')+'</Data></Cell>'
-      +'<Cell><Data ss:Type="String">'+(r.studentName||'')+'</Data></Cell>'
-      +'<Cell><Data ss:Type="String">'+cl+'</Data></Cell>'
-      +'<Cell><Data ss:Type="Number">'+(r.pct!=null?r.pct:0)+'</Data></Cell>'
-      +'<Cell><Data ss:Type="String">'+(r.score!=null?r.score+'/'+r.max:'—')+'</Data></Cell>'
-      +'<Cell><Data ss:Type="Number">'+(r.infractions||0)+'</Data></Cell>'
-      +'<Cell><Data ss:Type="String">'+(r.abandoned?'Abandonne':'Termine')+'</Data></Cell></Row>';
+    var style=(r.pct>=50)?'G':(r.pct!=null?'R':'');
+    xml+='<Row><Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+(r.date||'')+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+(r.studentName||'')+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+cl+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="Number">'+(r.pct!=null?r.pct:0)+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+(r.score!=null?r.score+'/'+r.max:'—')+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="Number">'+(r.infractions||0)+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+(r.abandoned?'Abandonne':'Termine')+'</Data></Cell></Row>';
   });
-  xml+='</Table></Worksheet></Workbook>';
-  var b=new Blob([xml],{type:'application/vnd.ms-excel'});
-  var a=document.createElement('a');a.href=URL.createObjectURL(b);
-  a.download=test.title.replace(/\s+/g,'_')+'_resultats.xls';
-  a.click();
+  xml+='</Table></Worksheet>';
+  // Onglet détail si breakdown disponible
+  var hasDetail=rows.some(function(r){return SL('ek_bk_'+r.studentName+'__'+r.testTitle+'__'+r.date,null);});
+  if(hasDetail){
+    xml+='<Worksheet ss:Name="Detail questions"><Table>'
+      +'<Row ss:StyleID="H"><Cell><Data ss:Type="String">Eleve</Data></Cell><Cell><Data ss:Type="String">Classe</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Q#</Data></Cell><Cell><Data ss:Type="String">Question</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Reponse donnee</Data></Cell><Cell><Data ss:Type="String">Correcte</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Resultat</Data></Cell></Row>';
+    rows.forEach(function(r){
+      var bk=SL('ek_bk_'+r.studentName+'__'+r.testTitle+'__'+r.date,null);
+      if(!bk)return;
+      var cl=String(r.classe||'').replace(/^_/,'');
+      bk.forEach(function(b,i){
+        var given=b.type==='qcm'?((b.options||[])[b.given]||'—'):String(b.given||'—');
+        var correct=b.type==='qcm'?((b.options||[])[b.answer]||'—'):String(b.expected||'—');
+        var style=b.ok===true?'G':b.ok===false?'R':'';
+        xml+='<Row><Cell><Data ss:Type="String">'+(r.studentName||'')+'</Data></Cell>'
+          +'<Cell><Data ss:Type="String">'+cl+'</Data></Cell>'
+          +'<Cell><Data ss:Type="Number">'+(i+1)+'</Data></Cell>'
+          +'<Cell><Data ss:Type="String">'+String(b.q||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</Data></Cell>'
+          +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+String(given).replace(/&/g,'&amp;')+'</Data></Cell>'
+          +'<Cell><Data ss:Type="String">'+String(correct).replace(/&/g,'&amp;')+'</Data></Cell>'
+          +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+(b.ok===true?'✓':b.ok===false?'✗':'?')+'</Data></Cell></Row>';
+      });
+    });
+    xml+='</Table></Worksheet>';
+  }
+  xml+='</Workbook>';
+  var blob=new Blob([xml],{type:'application/vnd.ms-excel'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=test.title.replace(/[^a-zA-Z0-9]/g,'_')+'_resultats.xls';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 
 function dlXML(test){
@@ -1389,7 +1420,14 @@ function runExam(container,exam,student,onDone){
     +'</div>';
 
     var rr=document.getElementById('rrows');
-    var showAns=_showAnswers; // variable globale directe - 100% fiable
+    // Lire showAnswers depuis la session active dans localStorage
+    var _sessions=SL(K.s,{});
+    var _activeSess=null;
+    Object.keys(_sessions).forEach(function(code){
+      var s=_sessions[code];
+      if(s&&s.active&&!_activeSess)_activeSess=s;
+    });
+    var showAns=_activeSess?_activeSess.showAnswers!==false:true;
     if(showAns){
       breakdown.forEach(function(b,i){
       var row=document.createElement('div');
