@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -597,10 +596,10 @@ function showInstantLock(){
 
 /* Surveiller la visibilité — verrouiller IMMÉDIATEMENT quand l'app revient au premier plan */
 /* ANTI-CHEAT */
-var _acActive=false,_onLock=null,_onSS=null,_infractions=0,_tx=0,_ty=0,_hidAt=0,_sst=null;
+var _acActive=false,_onLock=null,_onSS=null,_infractions=0,_tx=0,_ty=0,_hidAt=0,_sst=null,_resourcesOpen=false;
 
 function _lock(){
-  if(!_acActive)return;
+  if(!_acActive||_resourcesOpen)return;
   _infractions++;
   var ks=SL(K.k,null);if(ks){ks.infractions=_infractions;SS(K.k,ks);}
   _sendLiveInfraction();
@@ -710,6 +709,7 @@ function reFS(){var el=document.documentElement;(el.requestFullscreen||el.webkit
 /* Verrouiller INSTANTANÉMENT quand l'app revient au premier plan pendant une session kiosk */
 document.addEventListener('visibilitychange',function(){
   if(!document.hidden&&SL(K.k,null)&&!_kioskLockOverlay){
+    if(_resourcesOpen)return; // pas d'infraction si ressources ouvertes
     var lk=document.getElementById('lock');
     if(lk&&lk.style.display==='flex')return;
     _infractions++;
@@ -926,30 +926,81 @@ function runKiosk(payload,type,student){
   function showResources(){
     var resources=SL(K.res,[]);
     if(!resources.length)return;
-    var old=document.getElementById('res-overlay');if(old)old.remove();
+    var oldOv=document.getElementById('res-overlay');if(oldOv)oldOv.remove();
     var ov=document.createElement('div');
     ov.id='res-overlay';
     ov.style.cssText='position:fixed;inset:0;background:#06061a;z-index:9990;display:flex;flex-direction:column;';
-    // Onglets des sites
     var tabs=resources.map(function(r,i){
-      return '<button class="res-tab" data-ri="'+i+'" style="padding:8px 16px;border:none;border-bottom:2px solid '+(i===0?'var(--gd)':'transparent')+';background:transparent;color:'+(i===0?'#fff':'rgba(255,255,255,.5)')+';cursor:pointer;font-size:.82rem;font-weight:600;white-space:nowrap">'+r.name+'</button>';
+      return '<button class="res-tab" data-url="'+r.url+'" style="padding:8px 16px;border:none;border-bottom:2px solid '+(i===0?'var(--gd)':'transparent')+';background:transparent;color:'+(i===0?'#fff':'rgba(255,255,255,.5)')+';cursor:pointer;font-size:.82rem;font-weight:600;white-space:nowrap">'+r.name+'</button>';
     }).join('');
     ov.innerHTML='<div style="background:#0f2044;display:flex;align-items:center;gap:0;border-bottom:1px solid rgba(255,255,255,.1);overflow-x:auto">'
       +tabs
       +'<button id="res-close" style="margin-left:auto;padding:8px 16px;border:none;background:rgba(255,80,80,.2);color:#ffaaaa;cursor:pointer;font-size:.82rem;flex-shrink:0">✕ Fermer</button>'
     +'</div>'
-    +'<iframe id="res-iframe" src="'+resources[0].url+'" style="flex:1;border:none;background:#fff;width:100%;height:100%;" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>';
+    +'<div id="res-body" style="flex:1;position:relative;background:#fff;overflow:hidden;">'
+      +'<iframe id="res-iframe" src="" style="width:100%;height:100%;border:none;display:block;" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>'
+      +'<div id="res-blocked" style="display:none;position:absolute;inset:0;background:#0f2044;flex-direction:column;align-items:center;justify-content:center;gap:1rem;color:#fff;text-align:center;padding:2rem">'
+        +'<div style="font-size:2.5rem">&#128274;</div>'
+        +'<div style="font-weight:700;font-size:1.1rem">Ce site bloque l\'affichage integre</div>'
+        +'<div style="font-size:.87rem;opacity:.7;max-width:340px;line-height:1.6">Il s\'ouvrira dans un nouvel onglet.<br>Revenez sur EduKiosk apres votre recherche.</div>'
+        +'<button id="res-newtab" style="background:var(--gd);color:var(--nv);border:none;padding:10px 24px;border-radius:9px;cursor:pointer;font-size:.9rem;font-weight:700">&#128214; Ouvrir le site</button>'
+      +'</div>'
+    +'</div>';
     document.body.appendChild(ov);
 
-    document.getElementById('res-close').onclick=function(){ov.remove();};
+    var currentUrl=resources[0].url;
+
+    var PROXY='https://corsproxy.io/?url=';
+
+    function loadSite(url){
+      currentUrl=url;
+      var iframe=document.getElementById('res-iframe');
+      var blocked=document.getElementById('res-blocked');
+      if(blocked)blocked.style.display='none';
+      if(!iframe)return;
+      iframe.style.display='block';
+
+      // Essayer d'abord sans proxy
+      iframe.src='';
+      setTimeout(function(){iframe.src=url;},50);
+
+      var timer=setTimeout(function(){
+        // Après 3s sans chargement → passer par le proxy
+        iframe.src=PROXY+encodeURIComponent(url);
+      },3000);
+
+      iframe.onload=function(){
+        clearTimeout(timer);
+        try{
+          var d=iframe.contentDocument||iframe.contentWindow.document;
+          if(!d||!d.body||d.body.innerHTML==='')throw new Error('blocked');
+          // Chargé avec succès — annuler le timer proxy si encore actif
+        }catch(e){
+          clearTimeout(timer);
+          // Accès direct bloqué → proxy immédiatement
+          if(iframe.src.indexOf('corsproxy.io')===-1){
+            iframe.src=PROXY+encodeURIComponent(url);
+          }else{
+            // Même le proxy échoue → afficher fallback
+            iframe.style.display='none';
+            if(blocked){
+              blocked.style.display='flex';
+              var nb=document.getElementById('res-newtab');
+              if(nb)nb.onclick=function(){window.open(currentUrl,'_blank');};
+            }
+          }
+        }
+      };
+    }
+
+    loadSite(resources[0].url);
+    _resourcesOpen=true;
+    document.getElementById('res-close').onclick=function(){_resourcesOpen=false;ov.remove();};
     ov.querySelectorAll('.res-tab').forEach(function(btn){
       btn.onclick=function(){
-        ov.querySelectorAll('.res-tab').forEach(function(b){
-          b.style.borderBottomColor='transparent';b.style.color='rgba(255,255,255,.5)';
-        });
+        ov.querySelectorAll('.res-tab').forEach(function(b){b.style.borderBottomColor='transparent';b.style.color='rgba(255,255,255,.5)';});
         btn.style.borderBottomColor='var(--gd)';btn.style.color='#fff';
-        var iframe=document.getElementById('res-iframe');
-        if(iframe)iframe.src=resources[+btn.dataset.ri].url;
+        loadSite(btn.dataset.url);
       };
     });
   }
