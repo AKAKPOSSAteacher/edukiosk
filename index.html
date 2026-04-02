@@ -1097,15 +1097,16 @@ function runKiosk(payload,type,student){
     _liveStudent=null;
     SS(K.k,null);
     SS('ek_show_ans','1'); // reset à la valeur par défaut
-    var r=localResult||cloudResult;
-    if(r){
-      var all=[].concat(SL(K.r,[]));all.push(r);
-      try{SS(K.r,all);}catch(e){
-        // Si trop grand, sauvegarder sans breakdown
-        var r2=Object.assign({},r);delete r2.breakdown;
-        var all2=[].concat(SL(K.r,[]));all2.push(r2);SS(K.r,all2);
+    if(cloudResult){
+      // Sauvegarder résultat léger dans K.r
+      var all=[].concat(SL(K.r,[]));all.push(cloudResult);
+      try{SS(K.r,all);}catch(e){}
+      cloudPost('saveResult',cloudResult);
+      // Sauvegarder breakdown séparément par clé unique
+      if(localResult&&localResult.breakdown){
+        var bkKey='ek_bk_'+cloudResult.studentName+'__'+cloudResult.testTitle+'__'+cloudResult.date;
+        try{SS(bkKey,localResult.breakdown);}catch(e){}
       }
-      if(cloudResult)cloudPost('saveResult',cloudResult);
     }
     showDone();
   }
@@ -2115,25 +2116,11 @@ function showTeacher(){
   }
 
   function bTestResTable(rows){
-    // Fusionner avec les résultats locaux pour récupérer le breakdown
-    var localResults=SL(K.r,[]);
-    function normClasse(c){return String(c||'').replace(/^_/,'').trim();}
-    var mergedRows=rows.map(function(r){
-      if(r.breakdown)return r;
-      var local=localResults.find(function(lr){
-        return lr.breakdown
-          &&lr.studentName===r.studentName
-          &&normClasse(lr.classe)===normClasse(r.classe)
-          &&(lr.testTitle||lr.docTitle)===(r.testTitle||r.docTitle)
-          &&lr.date===r.date;
-      });
-      return local?Object.assign({},r,{breakdown:local.breakdown}):r;
-    });
     var wrap=document.createElement('div');wrap.className='tbl';
     var t=document.createElement('table');
     t.innerHTML='<thead><tr><th>Date</th><th>Eleve</th><th>Classe</th><th>Test</th><th>Score</th><th>Infractions</th><th></th></tr></thead>';
     var tb=document.createElement('tbody');
-    mergedRows.forEach(function(r){
+    rows.forEach(function(r){
       var tr=document.createElement('tr');var inf=r.infractions||0;
       tr.innerHTML='<td style="color:var(--mt);font-size:.78rem">'+(r.date||'—')+'</td>'
         +'<td style="font-weight:600">'+(r.studentName||'')+'</td>'
@@ -2143,9 +2130,10 @@ function showTeacher(){
           ?'<span style="background:#7c3aed;color:#fff;padding:3px 9px;border-radius:20px;font-size:.75rem;font-weight:700">Abandonne</span>'
           :(r.pct!=null?'<span style="font-weight:700;color:'+(r.pct>=50?'var(--gn)':'var(--rd)')+'">'+r.pct+'%</span><span style="font-size:.76rem;color:var(--mt)"> ('+(isNaN(Number(r.score))||r.score===null?'—':r.score)+'/'+(isNaN(Number(r.max))||r.max===undefined?'—':r.max)+')</span>':'—'))+'</td>'
         +'<td style="color:'+(inf>0?'var(--rd)':'var(--gn)')+';font-weight:'+(inf>0?700:400)+'">'+( inf>0?inf+' infr.':'OK')+'</td>'
-        +'<td>'+(r.breakdown&&r.breakdown.length?'<button class="btn bo bsm detail-btn">Details</button>':'—')+'</td>';
-      if(r.breakdown&&r.breakdown.length){
-        tr.querySelector('.detail-btn').onclick=function(){showBreakdown(r);};
+        +'<td>'+(r.breakdown||SL('ek_bk_'+r.studentName+'__'+(r.testTitle||r.docTitle)+'__'+r.date,null)?'<button class="btn bo bsm detail-btn">Details</button>':'—')+'</td>';
+      var bk=r.breakdown||SL('ek_bk_'+r.studentName+'__'+(r.testTitle||r.docTitle)+'__'+r.date,null);
+      if(bk){
+        tr.querySelector('.detail-btn').onclick=function(){showBreakdown(Object.assign({},r,{breakdown:bk}));};
       }
       tb.appendChild(tr);
     });
