@@ -221,7 +221,7 @@ td{padding:9px 12px;border-bottom:1px solid var(--bd);}tr:last-child td{border-b
 <script>
 'use strict';
 /* STORAGE LOCAL */
-var K={t:'ek_t',d:'ek_d',r:'ek_r',p:'ek_p',s:'ek_s',k:'ek_kiosk'};
+var K={t:'ek_t',d:'ek_d',r:'ek_r',p:'ek_p',s:'ek_s',k:'ek_kiosk',res:'ek_resources'};
 function SS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function SL(k,d){try{var r=localStorage.getItem(k);return r===null?d:JSON.parse(r);}catch(e){return d;}}
 
@@ -820,7 +820,9 @@ function showLogin(){
           return;
         }
         var sessions=SL(K.s,{});sessions[code]=sess;SS(K.s,sessions);
-        runKiosk(sess.data,sess.type,{name:name,classe:cl});
+        // Passer allowResources dans le payload
+        var finalData=Object.assign({},sess.data,{allowResources:!!sess.allowResources});
+        runKiosk(finalData,sess.type,{name:name,classe:cl});
       }else if(data&&data.session&&!data.session.active){
         showErr('Cette session est terminee.');
       }else{
@@ -896,14 +898,54 @@ function showIdForm(payload,type,onStart){
 /* KIOSK RUNNER */
 function runKiosk(payload,type,student){
   // Sauvegarder l'état kiosk — restauré si l'app se ferme sur iOS
-  SS(K.k,{payload:payload,type:type,student:student,infractions:0,t0:Date.now()});
+  SS(K.k,{payload:payload,type:type,student:student,infractions:0,t0:Date.now(),allowResources:!!(payload.allowResources||false)});
   _liveStudent={name:student.name,classe:student.classe,title:payload.title||'',type:type};
   requestWakeLock();
 
   render('<div style="min-height:100vh;background:var(--cr);display:flex;flex-direction:column"><div id="ac"></div><div id="ssov" style="display:none;flex-direction:column"><div style="font-size:2.5rem">&#128247;</div><div style="font-size:1.4rem;font-weight:800;color:#ff6b6b">CAPTURE DETECTEE</div><div style="opacity:.65;font-size:.9rem">Infraction enregistree.</div></div><div id="lock" style="display:none;flex-direction:column"><div class="l-icon">&#128274;</div><div class="l-title">SESSION VERROUILLEE</div><div class="l-sub">Tentative de navigation detectee.</div><div class="infr" id="l-infr"></div><div class="l-form"><input class="l-inp" type="password" id="l-pin" maxlength="30" placeholder="Code PIN professeur" autocomplete="new-password"><div id="l-err" style="color:#ff8080;font-size:.8rem;display:none">Code incorrect</div><button class="btn bg bfull" id="l-ok">Deverrouiller</button><button class="btn bfull" style="background:transparent;border:none;color:rgba(255,255,255,.3);font-size:.76rem" id="l-abort">Abandonner</button></div></div><div id="deov" style="display:none"></div><div id="kbody" style="flex:1;padding:1.5rem;overflow-y:auto"></div></div>');
 
-  function updAC(){var ac=document.getElementById('ac');if(ac)ac.innerHTML='<div id="acbar" class="ac" style="width:100%"><span><span class="acd" style="background:#ff6b6b"></span>'+(type==='doc'?'Consultation verrouillee':'Mode examen actif')+'</span><span><span class="acd" style="background:'+(_infractions===0?'#27ae60':'#ff6b6b')+'"></span>'+_infractions+' infraction(s)</span><span style="margin-left:auto;opacity:.4">ESC/Home bloques</span></div>';}
+  function updAC(){
+    var resources=SL(K.res,[]);
+    var ks=SL(K.k,null);
+    var allowRes=ks&&ks.allowResources&&resources.length;
+    var resBtn=allowRes?'<button id="res-btn" style="margin-left:auto;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:.75rem;">&#128218; Ressources</button>':'<span style="margin-left:auto"></span>';
+    var ac=document.getElementById('ac');
+    if(ac)ac.innerHTML='<div id="acbar" class="ac" style="width:100%;display:flex;align-items:center;gap:1.25rem"><span><span class="acd" style="background:#ff6b6b"></span>'+(type==='doc'?'Consultation verrouillee':'Mode examen actif')+'</span><span><span class="acd" style="background:'+(_infractions===0?'#27ae60':'#ff6b6b')+'"></span>'+_infractions+' infraction(s)</span><span style="opacity:.4">ESC bloques</span>'+resBtn+'</div>';
+    var rb=document.getElementById('res-btn');
+    if(rb)rb.onclick=function(){showResources();};
+  }
   updAC();
+
+  function showResources(){
+    var resources=SL(K.res,[]);
+    if(!resources.length)return;
+    var old=document.getElementById('res-overlay');if(old)old.remove();
+    var ov=document.createElement('div');
+    ov.id='res-overlay';
+    ov.style.cssText='position:fixed;inset:0;background:#06061a;z-index:9990;display:flex;flex-direction:column;';
+    // Onglets des sites
+    var tabs=resources.map(function(r,i){
+      return '<button class="res-tab" data-ri="'+i+'" style="padding:8px 16px;border:none;border-bottom:2px solid '+(i===0?'var(--gd)':'transparent')+';background:transparent;color:'+(i===0?'#fff':'rgba(255,255,255,.5)')+';cursor:pointer;font-size:.82rem;font-weight:600;white-space:nowrap">'+r.name+'</button>';
+    }).join('');
+    ov.innerHTML='<div style="background:#0f2044;display:flex;align-items:center;gap:0;border-bottom:1px solid rgba(255,255,255,.1);overflow-x:auto">'
+      +tabs
+      +'<button id="res-close" style="margin-left:auto;padding:8px 16px;border:none;background:rgba(255,80,80,.2);color:#ffaaaa;cursor:pointer;font-size:.82rem;flex-shrink:0">✕ Fermer</button>'
+    +'</div>'
+    +'<iframe id="res-iframe" src="'+resources[0].url+'" style="flex:1;border:none;background:#fff;width:100%;height:100%;" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>';
+    document.body.appendChild(ov);
+
+    document.getElementById('res-close').onclick=function(){ov.remove();};
+    ov.querySelectorAll('.res-tab').forEach(function(btn){
+      btn.onclick=function(){
+        ov.querySelectorAll('.res-tab').forEach(function(b){
+          b.style.borderBottomColor='transparent';b.style.color='rgba(255,255,255,.5)';
+        });
+        btn.style.borderBottomColor='var(--gd)';btn.style.color='#fff';
+        var iframe=document.getElementById('res-iframe');
+        if(iframe)iframe.src=resources[+btn.dataset.ri].url;
+      };
+    });
+  }
 
   function showLock(){
     updAC();
@@ -1437,6 +1479,7 @@ function showTeacher(){
       exitPin:exitPin,
       created:Date.now(),
       active:true,
+      allowResources:false,
       data:type==='doc'?Object.assign({},item,{exitPin:exitPin}):item
     };
 
@@ -1447,9 +1490,17 @@ function showTeacher(){
 
     var old=document.getElementById('sess-modal-bg');if(old)old.remove();
     var bg=document.createElement('div');bg.className='mbg';bg.id='sess-modal-bg';
+    var resources=SL(K.res,[]);
+    var resOption=resources.length
+      ?'<div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.08);border-radius:8px;padding:10px 14px;margin-bottom:1rem">'
+        +'<input type="checkbox" id="sess-res" style="width:18px;height:18px;accent-color:var(--gd);cursor:pointer;margin:0">'
+        +'<label for="sess-res" style="color:#fff;font-size:.87rem;cursor:pointer;margin:0">&#128218; Autoriser l\'accès aux ressources ('+resources.length+' site(s))</label>'
+      +'</div>'
+      :'';
     bg.innerHTML='<div class="modal" style="max-width:460px;text-align:center">'
       +'<div style="font-size:.85rem;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem">'+(type==='exam'?'Test':'Document')+'</div>'
       +'<div style="font-weight:800;font-size:1.1rem;color:var(--nv);margin-bottom:1.5rem">'+item.title+'</div>'
+      +resOption
       +'<div id="sess-saving" style="padding:2rem;color:var(--mt);font-size:.9rem">&#8635; Enregistrement en cours...</div>'
       +'<div id="sess-code-area" style="display:none">'
         +'<div style="background:var(--nv);border-radius:14px;padding:1.75rem;margin-bottom:1.25rem">'
@@ -1472,6 +1523,11 @@ function showTeacher(){
 
     // Envoyer au cloud et attendre confirmation
     function trySave(attempt){
+      // Lire la checkbox ressources
+      var cb=document.getElementById('sess-res');
+      if(cb)sess.allowResources=cb.checked;
+      // Mettre à jour le localStorage
+      var sessions2=SL(K.s,{});sessions2[sess.code]=sess;SS(K.s,sessions2);
       saveSessionToCloud(sess, function(ok){
         var saving=document.getElementById('sess-saving');
         var area=document.getElementById('sess-code-area');
@@ -1874,6 +1930,16 @@ function showTeacher(){
         +'</div>'
         +'<button class="btn br bsm" style="margin-top:12px" id="clr-res">Vider les resultats (libere de l\'espace)</button>'
       +'</div>'
+      +'<div class="card"><div class="ct mb1">&#128218; Sites ressources autorises</div>'
+        +'<p style="font-size:.84rem;color:var(--mt);margin-bottom:1rem">Ces sites seront accessibles aux eleves via le bouton &#128218; pendant la session, sans declencher d\'infraction.</p>'
+        +'<div id="res-list" style="margin-bottom:.85rem"></div>'
+        +'<div style="display:flex;gap:8px;margin-bottom:.5rem">'
+          +'<input type="text" id="res-name" placeholder="Nom (ex: WordReference)" style="flex:1;margin-bottom:0">'
+          +'<input type="text" id="res-url" placeholder="URL (ex: https://wordreference.com)" style="flex:2;margin-bottom:0">'
+        +'</div>'
+        +'<button class="btn bn bsm" id="res-add">+ Ajouter</button>'
+        +'<div id="res-msg" style="display:none;margin-top:.5rem"></div>'
+      +'</div>'
       +'<div class="card"><div class="ct mb1">&#128273; Code PIN professeur</div><p style="font-size:.84rem;color:var(--mt);margin-bottom:1rem">Jamais affiche a l\'ecran. Debloque une session verrouillee.</p><label>Nouveau code PIN</label><input type="password" id="npin" placeholder="Minimum 4 caracteres" style="max-width:260px" autocomplete="new-password"><div id="pmsg" style="display:none"></div><button class="btn bn" id="spin">Mettre a jour</button></div>'
       +'<div class="card" style="background:#fffbe6;border:1px solid #f5c842"><div class="ct mb1" style="color:#7a5c00">&#128272; Code de secours</div><p style="font-size:.84rem;color:#7a5c00;margin-bottom:1rem">Fonctionne dans tous les champs PIN pour deverrouiller en urgence. Choisissez un code que vous seul connaissez.</p><label style="color:#7a5c00">Code de secours actuel</label><input type="password" id="nmaster" placeholder="Minimum 4 caracteres" style="max-width:260px;border-color:#f5c842;background:#fffbe6" autocomplete="new-password"><div id="mmsg" style="display:none"></div><button class="btn" style="background:#f5c842;color:#7a5c00;font-weight:700" id="smaster">Mettre a jour</button></div>'
       +'<div class="card"><div class="ct mb1">&#128203; Workflow XML Moodle</div><div class="gs"><div class="gn">1</div><div><div style="font-weight:600;font-size:.88rem">Generez avec Claude</div><div style="font-size:.8rem;color:var(--mt)">Demandez : "Genere un quiz Moodle XML sur [sujet]"</div></div></div><div class="gs"><div class="gn">2</div><div><div style="font-weight:600;font-size:.88rem">Telechargez le .xml</div></div></div><div class="gs" style="border-bottom:none"><div class="gn">3</div><div><div style="font-weight:600;font-size:.88rem">Importez dans EduKiosk</div><div style="font-size:.8rem;color:var(--mt)">Tests &#8594; Nouveau &#8594; Importer XML</div></div></div></div>';
@@ -1945,6 +2011,43 @@ function showTeacher(){
           if(st)st.innerHTML='<span style="color:var(--rd)">Erreur - verifiez la connexion.</span>';
         }
       });
+    };
+
+    // Gestion des ressources
+    function renderResList(){
+      var resources=SL(K.res,[]);
+      var rl=document.getElementById('res-list');
+      if(!rl)return;
+      if(!resources.length){rl.innerHTML='<div style="font-size:.82rem;color:var(--mt)">Aucun site configure.</div>';return;}
+      rl.innerHTML=resources.map(function(r,i){
+        return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bd)">'
+          +'<span style="font-size:.82rem;flex:1"><strong>'+r.name+'</strong> — <span style="color:var(--mt)">'+r.url+'</span></span>'
+          +'<button class="btn br bsm" data-ri="'+i+'">X</button>'
+        +'</div>';
+      }).join('');
+      rl.querySelectorAll('[data-ri]').forEach(function(btn){
+        btn.onclick=function(){
+          var resources=SL(K.res,[]);
+          resources.splice(+btn.dataset.ri,1);
+          SS(K.res,resources);renderResList();
+        };
+      });
+    }
+    renderResList();
+    var radd=document.getElementById('res-add');
+    if(radd)radd.onclick=function(){
+      var name=(document.getElementById('res-name')||{}).value||'';
+      var url=(document.getElementById('res-url')||{}).value||'';
+      var msg=document.getElementById('res-msg');
+      if(!name.trim()||!url.trim()){if(msg){msg.className='merr';msg.textContent='Nom et URL requis.';msg.style.display='';}return;}
+      if(!url.startsWith('http')){if(msg){msg.className='merr';msg.textContent='URL invalide.';msg.style.display='';}return;}
+      var resources=SL(K.res,[]);
+      resources.push({name:name.trim(),url:url.trim()});
+      SS(K.res,resources);
+      document.getElementById('res-name').value='';
+      document.getElementById('res-url').value='';
+      if(msg){msg.className='mok';msg.textContent='Site ajoute !';msg.style.display='';setTimeout(function(){msg.style.display='none';},2000);}
+      renderResList();
     };
 
     var sm=document.getElementById('smaster');
