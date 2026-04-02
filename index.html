@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -1473,7 +1474,7 @@ function showTeacher(){
     };
   }
 
-  function showSessionModal(type, item){
+  function showSessionModal(type, item, allowRes){
     var code=genCode();
     var exitPin=genCode().slice(0,4);
     var sess={
@@ -1485,7 +1486,7 @@ function showTeacher(){
       exitPin:exitPin,
       created:Date.now(),
       active:true,
-      allowResources:false,
+      allowResources:!!allowRes,
       data:type==='doc'?Object.assign({},item,{exitPin:exitPin}):item
     };
 
@@ -1496,17 +1497,10 @@ function showTeacher(){
 
     var old=document.getElementById('sess-modal-bg');if(old)old.remove();
     var bg=document.createElement('div');bg.className='mbg';bg.id='sess-modal-bg';
-    var resources=SL(K.res,[]);
-    var resOption=resources.length
-      ?'<div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.08);border-radius:8px;padding:10px 14px;margin-bottom:1rem">'
-        +'<input type="checkbox" id="sess-res" style="width:18px;height:18px;accent-color:var(--gd);cursor:pointer;margin:0">'
-        +'<label for="sess-res" style="color:#fff;font-size:.87rem;cursor:pointer;margin:0">&#128218; Autoriser l\'accès aux ressources ('+resources.length+' site(s))</label>'
-      +'</div>'
-      :'';
     bg.innerHTML='<div class="modal" style="max-width:460px;text-align:center">'
       +'<div style="font-size:.85rem;color:var(--mt);text-transform:uppercase;letter-spacing:1px;margin-bottom:.5rem">'+(type==='exam'?'Test':'Document')+'</div>'
       +'<div style="font-weight:800;font-size:1.1rem;color:var(--nv);margin-bottom:1.5rem">'+item.title+'</div>'
-      +resOption
+      +(allowRes?'<div class="mok" style="margin-bottom:1rem;text-align:left">&#128218; Ressources autorisees pour cette session</div>':'')
       +'<div id="sess-saving" style="padding:2rem;color:var(--mt);font-size:.9rem">&#8635; Enregistrement en cours...</div>'
       +'<div id="sess-code-area" style="display:none">'
         +'<div style="background:var(--nv);border-radius:14px;padding:1.75rem;margin-bottom:1.25rem">'
@@ -1529,9 +1523,6 @@ function showTeacher(){
 
     // Envoyer au cloud et attendre confirmation
     function trySave(attempt){
-      // Lire la checkbox ressources
-      var cb=document.getElementById('sess-res');
-      if(cb)sess.allowResources=cb.checked;
       // Mettre à jour le localStorage
       var sessions2=SL(K.s,{});sessions2[sess.code]=sess;SS(K.s,sessions2);
       saveSessionToCloud(sess, function(ok){
@@ -1579,8 +1570,23 @@ function showTeacher(){
     if(!tests.length){mn.insertAdjacentHTML('beforeend','<div class="card tc" style="color:var(--mt)">Aucun test cree.</div>');return;}
     tests.forEach(function(t){
       var d=document.createElement('div');d.className='card';
-      d.innerHTML='<div class="ch"><div><div class="ct">'+t.title+'</div><div class="cm">'+t.subject+' · '+t.duration+'min · '+t.questions.length+'q'+(t.shuffle?' · <span style="color:#6d4aff;font-weight:700">Q.aleatoires</span>':'')+(t.noBack?' · <span style="color:var(--rd);font-weight:700">sans retour</span>':'')+'</div><div style="font-size:.74rem;color:var(--mt);margin-top:4px">'+results.filter(function(r){return r.testId===t.id;}).length+' resultat(s)</div></div><div class="row" style="gap:7px;flex-wrap:wrap"><button class="btn bk bsm" data-a="sess" data-id="'+t.id+'">&#9654; Demarrer session</button><span class="bdg '+(t.active?'b-gn':'b-rd')+'">'+(t.active?'Actif':'Inactif')+'</span><button class="btn bn bsm" data-a="xml" data-id="'+t.id+'">XML</button><button class="btn bo bsm" data-a="tog" data-id="'+t.id+'">'+(t.active?'Desactiver':'Activer')+'</button><button class="btn br bsm" data-a="del" data-id="'+t.id+'">X</button></div></div>';
-      d.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){var id=+b.dataset.id,t2=tests.find(function(x){return x.id===id;});if(!t2)return;if(b.dataset.a==='xml')dlXML(t2);else if(b.dataset.a==='sess')showSessionModal('exam',t2);else if(b.dataset.a==='tog'){tests=tests.map(function(x){return x.id===id?Object.assign({},x,{active:!x.active}):x;});svT();bMain();}else if(b.dataset.a==='del'){customConfirm('Supprimer le test "'+t2.title+'" ?',function(){tests=tests.filter(function(x){return x.id!==id;});svT();bMain();});}};});
+      var resources=SL(K.res,[]);
+      var resCheck=resources.length
+        ?'<label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--mt);cursor:pointer;margin-top:6px"><input type="checkbox" class="res-chk" style="accent-color:var(--nv);cursor:pointer"> &#128218; Ressources autorisees</label>'
+        :'';
+      d.innerHTML='<div><div class="ch" style="margin-bottom:'+(resCheck?'4px':'.9rem')+'"><div><div class="ct">'+t.title+'</div><div class="cm">'+t.subject+' · '+t.duration+'min · '+t.questions.length+'q'+(t.shuffle?' · <span style="color:#6d4aff;font-weight:700">Q.aleatoires</span>':'')+(t.noBack?' · <span style="color:var(--rd);font-weight:700">sans retour</span>':'')+'</div><div style="font-size:.74rem;color:var(--mt);margin-top:4px">'+results.filter(function(r){return r.testId===t.id;}).length+' resultat(s)</div></div><div class="row" style="gap:7px;flex-wrap:wrap"><button class="btn bk bsm" data-a="sess" data-id="'+t.id+'">&#9654; Demarrer session</button><span class="bdg '+(t.active?'b-gn':'b-rd')+'">'+(t.active?'Actif':'Inactif')+'</span><button class="btn bn bsm" data-a="xml" data-id="'+t.id+'">XML</button><button class="btn bo bsm" data-a="tog" data-id="'+t.id+'">'+(t.active?'Desactiver':'Activer')+'</button><button class="btn br bsm" data-a="del" data-id="'+t.id+'">X</button></div></div>'
+        +resCheck
+      +'</div>';
+      d.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){
+        var id=+b.dataset.id,t2=tests.find(function(x){return x.id===id;});if(!t2)return;
+        if(b.dataset.a==='xml')dlXML(t2);
+        else if(b.dataset.a==='sess'){
+          var chk=d.querySelector('.res-chk');
+          showSessionModal('exam',t2,chk&&chk.checked);
+        }
+        else if(b.dataset.a==='tog'){tests=tests.map(function(x){return x.id===id?Object.assign({},x,{active:!x.active}):x;});svT();bMain();}
+        else if(b.dataset.a==='del'){customConfirm('Supprimer le test "'+t2.title+'" ?',function(){tests=tests.filter(function(x){return x.id!==id;});svT();bMain();});}
+      };});
       mn.appendChild(d);
     });
   }
@@ -1669,8 +1675,20 @@ function showTeacher(){
     if(!docs.length){mn.insertAdjacentHTML('beforeend','<div class="card tc" style="color:var(--mt)">Aucun document.</div>');return;}
     docs.forEach(function(d){
       var div=document.createElement('div');div.className='card';
-      div.innerHTML='<div class="ch"><div style="min-width:0;flex:1"><div class="ct">'+d.title+'</div><div class="cm">'+d.subject+(d.docType==='link'?' <span class="bdg b-tl" style="font-size:.65rem">Lien</span>':'')+'</div><div style="font-size:.78rem;color:var(--mt);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+(d.docType==='link'?(d.linkUrl||'').slice(0,80):'('+d.docType+')')+'</div></div><div class="row" style="gap:7px;flex-shrink:0"><button class="btn bk bsm" data-a="sess" data-id="'+d.id+'">&#9654; Demarrer session</button><button class="btn br bsm" data-a="del" data-id="'+d.id+'">X</button></div></div>';
-      div.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){var id=+b.dataset.id,d2=docs.find(function(x){return x.id===id;});if(!d2)return;if(b.dataset.a==='sess')showSessionModal('doc',d2);else if(b.dataset.a==='del'){customConfirm('Supprimer le document "'+d2.title+'" ?',function(){docs=docs.filter(function(x){return x.id!==id;});svD();bMain();});}};});
+      var resources2=SL(K.res,[]);
+      var resCheck2=resources2.length
+        ?'<label style="display:flex;align-items:center;gap:6px;font-size:.76rem;color:var(--mt);cursor:pointer;margin-top:6px"><input type="checkbox" class="res-chk" style="accent-color:var(--nv);cursor:pointer"> &#128218; Ressources autorisees</label>'
+        :'';
+      div.innerHTML='<div><div class="ch" style="margin-bottom:'+(resCheck2?'4px':'.9rem')+'"><div style="min-width:0;flex:1"><div class="ct">'+d.title+'</div><div class="cm">'+d.subject+(d.docType==='link'?' <span class="bdg b-tl" style="font-size:.65rem">Lien</span>':'')+'</div><div style="font-size:.78rem;color:var(--mt);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+(d.docType==='link'?(d.linkUrl||'').slice(0,80):'('+d.docType+')')+'</div></div><div class="row" style="gap:7px;flex-shrink:0"><button class="btn bk bsm" data-a="sess" data-id="'+d.id+'">&#9654; Demarrer session</button><button class="btn br bsm" data-a="del" data-id="'+d.id+'">X</button></div></div>'
+        +resCheck2
+      +'</div>';
+      div.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){
+        var id=+b.dataset.id,d2=docs.find(function(x){return x.id===id;});if(!d2)return;
+        if(b.dataset.a==='sess'){
+          var chk=div.querySelector('.res-chk');
+          showSessionModal('doc',d2,chk&&chk.checked);
+        }else if(b.dataset.a==='del'){customConfirm('Supprimer le document "'+d2.title+'" ?',function(){docs=docs.filter(function(x){return x.id!==id;});svD();bMain();});}
+      };});
       mn.appendChild(div);
     });
   }
