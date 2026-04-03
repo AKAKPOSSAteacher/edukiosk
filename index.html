@@ -248,6 +248,7 @@ function saveSessionToCloud(sess, onDone){
     created:sess.created,
     active:sess.active,
     allowResources:!!sess.allowResources,
+    showAnswers:sess.showAnswers!==false,
     resources:sess.allowResources?SL(K.res,[]):[]
   };
   // Pour les documents texte, inclure le contenu directement (sinon l'élève ne peut pas l'afficher)
@@ -1482,11 +1483,7 @@ function runExam(container,exam,student,onDone){
     +'</div>';
 
     var rr=document.getElementById('rrows');
-    // Lire showAnswers depuis la session en cours (via code courant)
-    var _curCode=localStorage.getItem('ek_cur_code');
-    var _sessions=SL(K.s,{});
-    var _curSess=_curCode?_sessions[_curCode]:null;
-    var showAns=_curSess?_curSess.showAnswers!==false:true;
+    var showAns=_showAnswers;
     if(showAns){
       breakdown.forEach(function(b,i){
       var row=document.createElement('div');
@@ -1961,7 +1958,8 @@ function showTeacher(){
         }
         else if(b.dataset.a==='xls'){
           var btn2=b;btn2.disabled=true;btn2.textContent='Chargement...';
-          // Récupérer les réponses détaillées depuis Sheets
+          var xlsUrl=API_URL||SL('ek_api','');
+          if(!xlsUrl){exportTestXLS(t2,[]);return;}
           var cbName='_ek_xls_'+Date.now();
           var s2=document.createElement('script');
           window[cbName]=function(data){
@@ -1970,7 +1968,7 @@ function showTeacher(){
             exportTestXLS(t2,data&&data.ok?data.rows:[]);
           };
           s2.onerror=function(){delete window[cbName];btn2.disabled=false;btn2.textContent='💾 Excel';exportTestXLS(t2,[]);};
-          s2.src=API_URL+'?action=getAnswersDetail&title='+encodeURIComponent(t2.title)+'&callback='+cbName+'&t='+Date.now();
+          s2.src=xlsUrl+'?action=getAnswersDetail&title='+encodeURIComponent(t2.title)+'&callback='+cbName+'&t='+Date.now();
           document.head.appendChild(s2);
         }
         else if(b.dataset.a==='clr'){
