@@ -2373,6 +2373,7 @@ function showTeacher(){
         +'</div>'
         +'<button class="btn br bsm" style="margin-top:12px" id="clr-res">Vider les resultats (libere de l\'espace)</button>'
         +'<button class="btn br bsm" style="margin-top:8px;margin-left:8px" id="clr-sess">Vider les sessions</button>'
+        +'<button class="btn br bsm" style="margin-top:8px;margin-left:8px" id="clr-ans">Vider les reponses</button>'
       +'</div>'
       +'<div class="card"><div class="ct mb1">&#128218; Sites ressources autorises</div>'
         +'<p style="font-size:.84rem;color:var(--mt);margin-bottom:1rem">Ces sites seront accessibles aux eleves via le bouton &#128218; pendant la session. Cochez ceux a proposer par defaut.</p>'
@@ -2526,7 +2527,13 @@ function showTeacher(){
     };
     var sp=document.getElementById('spin');if(sp)sp.onclick=function(){var nv=v('#npin'),msg=document.getElementById('pmsg');if(nv.length<4){if(msg){msg.className='merr';msg.textContent='4 caracteres minimum.';msg.style.display='';}}else{SS(K.p,nv);cloudPost('savePin',nv);if(msg){msg.className='mok';msg.textContent='Code PIN mis a jour !';msg.style.display='';setTimeout(function(){msg.style.display='none';},3000);}}};
     var cr=document.getElementById('clr-res');if(cr)cr.onclick=function(){customConfirm('Vider tous les resultats ? Cela liberera de l\'espace.',function(){results=[];SS(K.r,[]);bMain();showToast('Resultats effaces.');});};
-    var cs=document.getElementById('clr-sess');if(cs)cs.onclick=function(){customConfirm('Vider toutes les sessions actives ?',function(){
+    var ca=document.getElementById('clr-ans');if(ca)ca.onclick=function(){customConfirm('Vider toutes les reponses detaillees (AnswersDetail) ?',function(){
+      var cbName='_ek_clra_'+Date.now();
+      window[cbName]=function(){delete window[cbName];showToast('Reponses videes.');};
+      var s=document.createElement('script');
+      s.src=(API_URL||SL('ek_api',''))+'?action=clearAnswersDetail&callback='+cbName+'&t='+Date.now();
+      document.head.appendChild(s);
+    });};if(cs)cs.onclick=function(){customConfirm('Vider toutes les sessions actives ?',function(){
       SS(K.s,{});
       // Désactiver aussi dans le cloud
       var cbName='_ek_clrs_'+Date.now();
