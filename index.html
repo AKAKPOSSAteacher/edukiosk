@@ -565,66 +565,103 @@ function exportXML(test){
 function exportTestXLS(test){
   var localR=SL(K.r,[]);
   var rows=localR.filter(function(r){return r.testId===test.id||r.testTitle===test.title;});
-  if(!rows.length){
-    // Fallback sur résultats cloud (sans testId)
-    rows=results.filter(function(r){return r.testTitle===test.title;});
-  }
-  if(!rows.length){alert('Aucun résultat. Faites d\'abord passer le test puis actualisez.');return;}
+  if(!rows.length)rows=results.filter(function(r){return r.testTitle===test.title;});
+  if(!rows.length){alert('Aucun résultat. Faites d\'abord passer le test.');return;}
+
   var xml='<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>'
     +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
-    +'<Styles><Style ss:ID="H"><Font ss:Bold="1"/><Interior ss:Color="#0F2044" ss:Pattern="Solid"/><Font ss:Color="#FFFFFF" ss:Bold="1"/></Style>'
+    +'<Styles>'
+    +'<Style ss:ID="H"><Font ss:Bold="1"/><Interior ss:Color="#0F2044" ss:Pattern="Solid"/><Font ss:Color="#FFFFFF" ss:Bold="1"/></Style>'
     +'<Style ss:ID="G"><Interior ss:Color="#EAFAF1" ss:Pattern="Solid"/></Style>'
-    +'<Style ss:ID="R"><Interior ss:Color="#FDECEA" ss:Pattern="Solid"/></Style></Styles>'
+    +'<Style ss:ID="R"><Interior ss:Color="#FDECEA" ss:Pattern="Solid"/></Style>'
+    +'</Styles>'
     +'<Worksheet ss:Name="Resultats"><Table>'
-    +'<Row ss:StyleID="H"><Cell><Data ss:Type="String">Date</Data></Cell><Cell><Data ss:Type="String">Eleve</Data></Cell>'
-    +'<Cell><Data ss:Type="String">Classe</Data></Cell><Cell><Data ss:Type="String">Score %</Data></Cell>'
-    +'<Cell><Data ss:Type="String">Score</Data></Cell><Cell><Data ss:Type="String">Infractions</Data></Cell>'
+    +'<Row ss:StyleID="H"><Cell><Data ss:Type="String">Date</Data></Cell>'
+    +'<Cell><Data ss:Type="String">Eleve</Data></Cell>'
+    +'<Cell><Data ss:Type="String">Classe</Data></Cell>'
+    +'<Cell><Data ss:Type="String">Score %</Data></Cell>'
+    +'<Cell><Data ss:Type="String">Score</Data></Cell>'
+    +'<Cell><Data ss:Type="String">Infractions</Data></Cell>'
     +'<Cell><Data ss:Type="String">Statut</Data></Cell></Row>';
   rows.forEach(function(r){
     var cl=String(r.classe||'').replace(/^_/,'');
-    var style=(r.pct>=50)?'G':(r.pct!=null?'R':'');
-    xml+='<Row><Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+(r.date||'')+'</Data></Cell>'
-      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+(r.studentName||'')+'</Data></Cell>'
-      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+cl+'</Data></Cell>'
-      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="Number">'+(r.pct!=null?r.pct:0)+'</Data></Cell>'
-      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+(r.score!=null?r.score+'/'+r.max:'—')+'</Data></Cell>'
-      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="Number">'+(r.infractions||0)+'</Data></Cell>'
-      +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+(r.abandoned?'Abandonne':'Termine')+'</Data></Cell></Row>';
+    var sty=r.pct>=50?'G':r.pct!=null?'R':'';
+    xml+='<Row>'
+      +'<Cell ss:StyleID="'+sty+'"><Data ss:Type="String">'+(r.date||'')+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+sty+'"><Data ss:Type="String">'+(r.studentName||'')+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+sty+'"><Data ss:Type="String">'+cl+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+sty+'"><Data ss:Type="Number">'+(r.pct!=null?r.pct:0)+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+sty+'"><Data ss:Type="String">'+(r.score!=null?r.score+'/'+r.max:'—')+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+sty+'"><Data ss:Type="Number">'+(r.infractions||0)+'</Data></Cell>'
+      +'<Cell ss:StyleID="'+sty+'"><Data ss:Type="String">'+(r.abandoned?'Abandonne':'Termine')+'</Data></Cell>'
+    +'</Row>';
   });
   xml+='</Table></Worksheet>';
-  // Onglet détail si breakdown disponible
-  var hasDetail=rows.some(function(r){return SL('ek_bk_'+r.studentName+'__'+r.testTitle+'__'+r.date,null);});
-  if(hasDetail){
-    xml+='<Worksheet ss:Name="Detail questions"><Table>'
-      +'<Row ss:StyleID="H"><Cell><Data ss:Type="String">Eleve</Data></Cell><Cell><Data ss:Type="String">Classe</Data></Cell>'
-      +'<Cell><Data ss:Type="String">Q#</Data></Cell><Cell><Data ss:Type="String">Question</Data></Cell>'
-      +'<Cell><Data ss:Type="String">Reponse donnee</Data></Cell><Cell><Data ss:Type="String">Correcte</Data></Cell>'
-      +'<Cell><Data ss:Type="String">Resultat</Data></Cell></Row>';
-    rows.forEach(function(r){
-      var bk=SL('ek_bk_'+r.studentName+'__'+r.testTitle+'__'+r.date,null);
-      if(!bk)return;
+
+  // Onglet 2 : réponses détaillées (si breakdown disponible)
+  var rowsWithBk=rows.filter(function(r){return r.breakdown&&r.breakdown.length;});
+  if(rowsWithBk.length){
+    xml+='<Worksheet ss:Name="Reponses par question"><Table>'
+      +'<Row ss:StyleID="H">'
+      +'<Cell><Data ss:Type="String">Eleve</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Classe</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Q#</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Question</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Type</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Reponse donnee</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Reponse correcte</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Resultat</Data></Cell>'
+      +'</Row>';
+    rowsWithBk.forEach(function(r){
       var cl=String(r.classe||'').replace(/^_/,'');
-      bk.forEach(function(b,i){
-        var given=b.type==='qcm'?((b.options||[])[b.given]||'—'):String(b.given||'—');
-        var correct=b.type==='qcm'?((b.options||[])[b.answer]||'—'):String(b.expected||'—');
-        var style=b.ok===true?'G':b.ok===false?'R':'';
-        xml+='<Row><Cell><Data ss:Type="String">'+(r.studentName||'')+'</Data></Cell>'
+      r.breakdown.forEach(function(b,i){
+        var given='—',correct='—';
+        if(b.type==='qcm'){
+          given=b.options&&b.options[b.given]!=null?String(b.options[b.given]):'—';
+          correct=b.options&&b.options[b.answer]!=null?String(b.options[b.answer]):'—';
+        }else if(b.type==='vf'){
+          given=b.given===true?'Vrai':b.given===false?'Faux':'—';
+          correct=b.answer===true?'Vrai':'Faux';
+        }else if(b.type==='short'){
+          given=String(b.given||'—');correct=String(b.expected||'—');
+        }else if(b.type==='blanks'){
+          var gp=[],cp=[];
+          (b.blanks||[]).forEach(function(bl,bi){gp.push(String((b.given||{})[bi]||'—'));cp.push(String(bl.v||'—'));});
+          given=gp.join(' | ');correct=cp.join(' | ');
+        }else if(b.type==='match'){
+          var gm=[],cm=[];
+          (b.pairs||[]).forEach(function(p,pi){gm.push(p.l+'→'+String((b.given||{})[pi]||'?'));cm.push(p.l+'→'+p.r);});
+          given=gm.join(' | ');correct=cm.join(' | ');
+        }
+        var sty=b.ok===true?'G':b.ok===false?'R':'';
+        var res=b.ok===true?'✓':b.ok===false?'✗':'?';
+        var q=String(b.q||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        given=given.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+        correct=correct.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+        xml+='<Row>'
+          +'<Cell><Data ss:Type="String">'+(r.studentName||'')+'</Data></Cell>'
           +'<Cell><Data ss:Type="String">'+cl+'</Data></Cell>'
           +'<Cell><Data ss:Type="Number">'+(i+1)+'</Data></Cell>'
-          +'<Cell><Data ss:Type="String">'+String(b.q||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</Data></Cell>'
-          +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+String(given).replace(/&/g,'&amp;')+'</Data></Cell>'
-          +'<Cell><Data ss:Type="String">'+String(correct).replace(/&/g,'&amp;')+'</Data></Cell>'
-          +'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+(b.ok===true?'✓':b.ok===false?'✗':'?')+'</Data></Cell></Row>';
+          +'<Cell><Data ss:Type="String">'+q+'</Data></Cell>'
+          +'<Cell><Data ss:Type="String">'+b.type+'</Data></Cell>'
+          +'<Cell ss:StyleID="'+sty+'"><Data ss:Type="String">'+given+'</Data></Cell>'
+          +'<Cell><Data ss:Type="String">'+correct+'</Data></Cell>'
+          +'<Cell ss:StyleID="'+sty+'"><Data ss:Type="String">'+res+'</Data></Cell>'
+        +'</Row>';
       });
     });
     xml+='</Table></Worksheet>';
   }
+
   xml+='</Workbook>';
   var blob=new Blob([xml],{type:'application/vnd.ms-excel'});
-  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
   a.download=test.title.replace(/[^a-zA-Z0-9]/g,'_')+'_resultats.xls';
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  document.body.appendChild(a);a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(a.href);},1000);
 }
+
 
 function dlXML(test){
   var b=new Blob([exportXML(test)],{type:'application/xml'});
