@@ -562,11 +562,12 @@ function exportXML(test){
   return x+'</quiz>';
 }
 
-function exportTestXLS(test){
+function exportTestXLS(test, sheetsRows){
   var localR=SL(K.r,[]);
   var rows=localR.filter(function(r){return r.testId===test.id||r.testTitle===test.title;});
   if(!rows.length)rows=results.filter(function(r){return r.testTitle===test.title;});
   if(!rows.length){alert('Aucun résultat. Faites d\'abord passer le test.');return;}
+  sheetsRows=sheetsRows||[];
 
   var xml='<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>'
     +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
@@ -598,9 +599,36 @@ function exportTestXLS(test){
   });
   xml+='</Table></Worksheet>';
 
-  // Onglet 2 : réponses détaillées (si breakdown disponible)
+  // Onglet 2 : réponses détaillées depuis Sheets (priorité) ou local
   var rowsWithBk=rows.filter(function(r){return r.breakdown&&r.breakdown.length;});
-  if(rowsWithBk.length){
+  if(sheetsRows.length>0){
+    xml+='<Worksheet ss:Name="Reponses par question"><Table>'
+      +'<Row ss:StyleID="H">'
+      +'<Cell><Data ss:Type="String">Eleve</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Classe</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Q#</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Question</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Type</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Reponse donnee</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Reponse correcte</Data></Cell>'
+      +'<Cell><Data ss:Type="String">Resultat</Data></Cell>'
+      +'</Row>';
+    sheetsRows.forEach(function(r){
+      var sty=r.result==='✓'?'G':r.result==='✗'?'R':'';
+      var esc=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');};
+      xml+='<Row>'
+        +'<Cell><Data ss:Type="String">'+esc(r.studentName)+'</Data></Cell>'
+        +'<Cell><Data ss:Type="String">'+esc(r.classe)+'</Data></Cell>'
+        +'<Cell><Data ss:Type="Number">'+(r.qNum||0)+'</Data></Cell>'
+        +'<Cell><Data ss:Type="String">'+esc(r.question)+'</Data></Cell>'
+        +'<Cell><Data ss:Type="String">'+esc(r.type)+'</Data></Cell>'
+        +'<Cell ss:StyleID="'+sty+'"><Data ss:Type="String">'+esc(r.given)+'</Data></Cell>'
+        +'<Cell><Data ss:Type="String">'+esc(r.correct)+'</Data></Cell>'
+        +'<Cell ss:StyleID="'+sty+'"><Data ss:Type="String">'+esc(r.result)+'</Data></Cell>'
+      +'</Row>';
+    });
+    xml+='</Table></Worksheet>';
+  }else if(rowsWithBk.length){
     xml+='<Worksheet ss:Name="Reponses par question"><Table>'
       +'<Row ss:StyleID="H">'
       +'<Cell><Data ss:Type="String">Eleve</Data></Cell>'
@@ -651,7 +679,7 @@ function exportTestXLS(test){
       });
     });
     xml+='</Table></Worksheet>';
-  }
+  } // fin else if rowsWithBk
 
   xml+='</Workbook>';
   var blob=new Blob([xml],{type:'application/vnd.ms-excel'});
@@ -1043,7 +1071,7 @@ function showLogin(){
   }
 
   // Toujours mettre à jour l'URL avec la dernière version
-  API_URL='https://script.google.com/macros/s/AKfycbxvHPftuP0iVfGxba2g3sS8_koSU358bCTdmHCSFOZ_71_Fljfi-XqjKaei_9nxHPPC/exec';
+  API_URL='https://script.google.com/macros/s/AKfycbwbh1sDB8x1fxg0tsXNeiC41bv7m3PSG5cBW1HvS2ZH6jhyCmTm1Isne5MUeCxiJ2bq/exec';
   SS('ek_api',API_URL);
   cloudGet(function(){MASTER=SL('ek_master','****');});
 }
@@ -1614,7 +1642,7 @@ function showTeacher(){
 
   // Stocker l'URL API si pas encore fait
   // Toujours mettre à jour l'URL avec la dernière version
-  SS('ek_api','https://script.google.com/macros/s/AKfycbxvHPftuP0iVfGxba2g3sS8_koSU358bCTdmHCSFOZ_71_Fljfi-XqjKaei_9nxHPPC/exec');
+  SS('ek_api','https://script.google.com/macros/s/AKfycbwbh1sDB8x1fxg0tsXNeiC41bv7m3PSG5cBW1HvS2ZH6jhyCmTm1Isne5MUeCxiJ2bq/exec');
   API_URL=SL('ek_api','');
 
   render('<div id="tb" class="tb"><div class="tb-brand"><div class="tb-dot"></div>EduKiosk <span class="bdg b-gd" style="margin-left:8px">PROF</span></div><div class="tb-right"><span id="sync-status" style="font-size:.75rem;opacity:.8;margin-right:4px"></span><button class="tb-btn" id="tb-sync">&#8635; Sync</button><button class="tb-btn" id="tl">Deconnexion</button></div></div><div class="layout"><div class="sidebar" id="tnav"></div><div class="main" id="tmain"></div></div>');
@@ -1931,7 +1959,20 @@ function showTeacher(){
           var achk=d.querySelector('.ans-chk');
           showSessionModal('exam',t2,chk&&chk.checked,achk?achk.checked:true);
         }
-        else if(b.dataset.a==='xls')exportTestXLS(t2);
+        else if(b.dataset.a==='xls'){
+          var btn2=b;btn2.disabled=true;btn2.textContent='Chargement...';
+          // Récupérer les réponses détaillées depuis Sheets
+          var cbName='_ek_xls_'+Date.now();
+          var s2=document.createElement('script');
+          window[cbName]=function(data){
+            delete window[cbName];if(s2&&s2.parentNode)s2.parentNode.removeChild(s2);
+            btn2.disabled=false;btn2.textContent='💾 Excel';
+            exportTestXLS(t2,data&&data.ok?data.rows:[]);
+          };
+          s2.onerror=function(){delete window[cbName];btn2.disabled=false;btn2.textContent='💾 Excel';exportTestXLS(t2,[]);};
+          s2.src=API_URL+'?action=getAnswersDetail&title='+encodeURIComponent(t2.title)+'&callback='+cbName+'&t='+Date.now();
+          document.head.appendChild(s2);
+        }
         else if(b.dataset.a==='clr'){
           customConfirm('Effacer tous les résultats de "'+t2.title+'" ?',function(){
             results=results.filter(function(r){return r.testId!==t2.id;});
