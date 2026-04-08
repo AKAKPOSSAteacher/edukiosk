@@ -1625,11 +1625,23 @@ function showTeacher(){
 
   render('<div id="tb" class="tb"><div class="tb-brand"><div class="tb-dot"></div>EduKiosk <span class="bdg b-gd" style="margin-left:8px">PROF</span></div><div class="tb-right"><span id="sync-status" style="font-size:.75rem;opacity:.8;margin-right:4px"></span><button class="tb-btn" id="tb-sync">&#8635; Sync</button><button class="tb-btn" id="tl">Deconnexion</button></div></div><div class="layout"><div class="sidebar" id="tnav"></div><div class="main" id="tmain"></div></div>');
   var tl=document.getElementById('tl');if(tl)tl.onclick=showLogin;
-  var tbs=document.getElementById('tb-sync');if(tbs)tbs.onclick=function(){cloudGet(function(){tests=SL(K.t,[]);docs=SL(K.d,[]);results=SL(K.r,[]);bNav();bMain();});};
+  var tbs=document.getElementById('tb-sync');if(tbs)tbs.onclick=function(){cloudGet(function(data){
+    if(data&&data.ok){tests=data.tests||[];SS(K.t,tests);docs=data.docs||[];SS(K.d,docs);results=data.results||[];SS(K.r,results);}
+    else{tests=SL(K.t,[]);docs=SL(K.d,[]);results=SL(K.r,[]);}
+    bNav();bMain();
+  });};
 
-  // Chargement initial depuis le cloud
+  // Chargement initial depuis le cloud — toujours priorité au cloud
   cloudGet(function(data){
-    tests=SL(K.t,[]);docs=SL(K.d,[]);results=SL(K.r,[]);
+    if(data&&data.ok){
+      // Le cloud est la source de vérité — écraser le localStorage complètement
+      tests=data.tests||[];SS(K.t,tests);
+      docs=data.docs||[];SS(K.d,docs);
+      results=data.results||[];SS(K.r,results);
+    }else{
+      // Hors ligne — utiliser le localStorage
+      tests=SL(K.t,[]);docs=SL(K.d,[]);results=SL(K.r,[]);
+    }
     bNav();bMain();
   });
 
@@ -2183,7 +2195,7 @@ function showTeacher(){
     }
 
     mn.innerHTML='<div class="ch mb1"><h1 class="pg" style="margin:0">Resultats</h1><div style="display:flex;gap:8px"><button class="btn bk bsm" id="r-export">&#8681; Exporter CSV/Excel</button>'+(results.length?'<button class="btn br bsm" id="rcl">Vider tout</button>':'')+'</div></div>';
-    var rc=document.getElementById('rcl');if(rc)rc.onclick=function(){customConfirm('Vider tous les resultats ?',function(){results=[];SS(K.r,[]);bMain();});};
+    var rc=document.getElementById('rcl');if(rc)rc.onclick=function(){customConfirm('Vider tous les resultats ?',function(){results=[];SS(K.r,[]);cloudPost('saveResults',[]);bMain();});};
     var re=document.getElementById('r-export');if(re)re.onclick=doExport;
 
     if(!results.length){mn.insertAdjacentHTML('beforeend','<div class="card tc" style="color:var(--mt)">Aucun resultat.</div>');return;}
@@ -2395,9 +2407,10 @@ function showTeacher(){
           +'Le stockage localStorage est limite a <strong>5 Mo</strong> par le navigateur.'
           +(pct>80?'<div class="mwarn" style="margin-top:8px">&#9888; Stockage presque plein.</div>':'')
         +'</div>'
-        +'<button class="btn br bsm" style="margin-top:12px" id="clr-res">Vider les resultats (libere de l\'espace)</button>'
+        +'<button class="btn br bsm" style="margin-top:12px" id="clr-res">Vider les resultats</button>'
         +'<button class="btn br bsm" style="margin-top:8px;margin-left:8px" id="clr-sess">Vider les sessions</button>'
         +'<button class="btn br bsm" style="margin-top:8px;margin-left:8px" id="clr-ans">Vider les reponses</button>'
+        +'<button class="btn br bsm" style="margin-top:8px;margin-left:8px" id="clr-infr">Vider les infractions</button>'
       +'</div>'
       +'<div class="card"><div class="ct mb1">&#128218; Sites ressources autorises</div>'
         +'<p style="font-size:.84rem;color:var(--mt);margin-bottom:1rem">Ces sites seront accessibles aux eleves via le bouton &#128218; pendant la session. Cochez ceux a proposer par defaut.</p>'
@@ -2550,25 +2563,39 @@ function showTeacher(){
       }
     };
     var sp=document.getElementById('spin');if(sp)sp.onclick=function(){var nv=v('#npin'),msg=document.getElementById('pmsg');if(nv.length<4){if(msg){msg.className='merr';msg.textContent='4 caracteres minimum.';msg.style.display='';}}else{SS(K.p,nv);cloudPost('savePin',nv);if(msg){msg.className='mok';msg.textContent='Code PIN mis a jour !';msg.style.display='';setTimeout(function(){msg.style.display='none';},3000);}}};
-    var cr=document.getElementById('clr-res');if(cr)cr.onclick=function(){customConfirm('Vider tous les resultats ? Cela liberera de l\'espace.',function(){results=[];SS(K.r,[]);bMain();showToast('Resultats effaces.');});};
-    var ca=document.getElementById('clr-ans');if(ca)ca.onclick=function(){customConfirm('Vider toutes les reponses detaillees (AnswersDetail) ?',function(){
-      var cbName='_ek_clra_'+Date.now();
-      window[cbName]=function(){delete window[cbName];showToast('Reponses videes.');};
-      var s=document.createElement('script');
-      s.src=(API_URL||SL('ek_api',''))+'?action=clearAnswersDetail&callback='+cbName+'&t='+Date.now();
-      document.head.appendChild(s);
-    });};if(cs)cs.onclick=function(){customConfirm('Vider toutes les sessions actives ?',function(){
+    var cr=document.getElementById('clr-res');if(cr)cr.onclick=function(){customConfirm('Vider tous les resultats ?',function(){
+      results=[];SS(K.r,[]);
+      cloudPost('saveResults',[]);
+      bMain();showToast('Resultats effaces.');
+    });};
+
+    var cs=document.getElementById('clr-sess');if(cs)cs.onclick=function(){customConfirm('Vider toutes les sessions actives ?',function(){
       SS(K.s,{});
-      // Désactiver aussi dans le cloud
       var cbName='_ek_clrs_'+Date.now();
       window[cbName]=function(){delete window[cbName];};
       var s=document.createElement('script');
       s.src=(API_URL||SL('ek_api',''))+'?action=clearSessions&callback='+cbName+'&t='+Date.now();
       document.head.appendChild(s);
       showToast('Sessions videes.');
-    });
-  };
-  }
+    });};
+
+    var ca=document.getElementById('clr-ans');if(ca)ca.onclick=function(){customConfirm('Vider toutes les reponses (AnswersDetail) ?',function(){
+      var cbName='_ek_clra_'+Date.now();
+      window[cbName]=function(){delete window[cbName];showToast('Reponses videes.');};
+      var s=document.createElement('script');
+      s.src=(API_URL||SL('ek_api',''))+'?action=clearAnswersDetail&callback='+cbName+'&t='+Date.now();
+      document.head.appendChild(s);
+    });};
+
+    var ci=document.getElementById('clr-infr');if(ci)ci.onclick=function(){customConfirm('Vider les infractions en direct ?',function(){
+      var cbName='_ek_clri_'+Date.now();
+      window[cbName]=function(){delete window[cbName];showToast('Infractions videes.');};
+      var s=document.createElement('script');
+      s.src=(API_URL||SL('ek_api',''))+'?action=clearLiveInfractions&callback='+cbName+'&t='+Date.now();
+      document.head.appendChild(s);
+    });};
+
+  } // fin bSettings
 
   bNav();bMain();
 }
