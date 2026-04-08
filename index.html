@@ -942,6 +942,7 @@ function showLogin(){
       btn.disabled=false;if(loading)loading.style.display='none';
       if(sess.resources&&sess.resources.length)SS(K.res,sess.resources);
       localStorage.setItem('ek_cur_code',code); // stocker le code courant
+      SS(K.k,null);_infractions=0; // remettre à zéro pour nouvelle session
       var localData=Object.assign({},sess.data,{allowResources:!!sess.allowResources,showAnswers:sess.showAnswers!==false});
       runKiosk(localData,sess.type,{name:name,classe:cl});
       return;
@@ -1002,6 +1003,7 @@ function showLogin(){
         }
         var sessions=SL(K.s,{});sessions[code]=sess;SS(K.s,sessions);
         localStorage.setItem('ek_cur_code',code); // stocker le code courant
+        SS(K.k,null);_infractions=0; // remettre à zéro pour nouvelle session
         // Passer allowResources dans le payload
         var finalData=Object.assign({},sess.data,{allowResources:!!sess.allowResources,showAnswers:sess.showAnswers!==false});
         runKiosk(finalData,sess.type,{name:name,classe:cl});
