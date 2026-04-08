@@ -341,6 +341,7 @@ function cloudGet(onDone){
         }
         if(data.pin&&data.pin!=='PROF2024'){SS(K.p,data.pin);}
         if(data.master){SS('ek_master',data.master);MASTER=data.master;}
+        if(data.resources){SS(K.res,data.resources);}
         syncStatus('Synchronise \u2713',true);
         onDone&&onDone(data);
       }else{
@@ -2496,6 +2497,14 @@ function showTeacher(){
     };
 
     // Gestion des ressources
+    function saveResourcesToCloud(resources){
+      var cbName='_ek_res_'+Date.now();
+      window[cbName]=function(){delete window[cbName];};
+      var s=document.createElement('script');
+      s.src=(API_URL||SL('ek_api',''))+'?action=saveResources&data='+encodeURIComponent(JSON.stringify(resources))+'&callback='+cbName+'&t='+Date.now();
+      document.head.appendChild(s);
+    }
+
     function renderResList(){
       var resources=SL(K.res,[]);
       var rl=document.getElementById('res-list');
@@ -2518,13 +2527,16 @@ function showTeacher(){
           var idx=+chk.dataset.ri;
           if(resources[idx])resources[idx].defaultOn=chk.checked;
           SS(K.res,resources);
+          saveResourcesToCloud(resources);
         };
       });
       rl.querySelectorAll('[data-ri]').forEach(function(btn){
         if(btn.tagName==='BUTTON')btn.onclick=function(){
           var resources=SL(K.res,[]);
           resources.splice(+btn.dataset.ri,1);
-          SS(K.res,resources);renderResList();
+          SS(K.res,resources);
+          saveResourcesToCloud(resources);
+          renderResList();
         };
       });
     }
@@ -2539,6 +2551,12 @@ function showTeacher(){
       var resources=SL(K.res,[]);
       resources.push({name:name.trim(),url:url.trim()});
       SS(K.res,resources);
+      // Synchroniser avec Sheets
+      var cbName='_ek_res_'+Date.now();
+      window[cbName]=function(){delete window[cbName];};
+      var sr=document.createElement('script');
+      sr.src=(API_URL||SL('ek_api',''))+'?action=saveResources&data='+encodeURIComponent(JSON.stringify(resources))+'&callback='+cbName+'&t='+Date.now();
+      document.head.appendChild(sr);
       document.getElementById('res-name').value='';
       document.getElementById('res-url').value='';
       if(msg){msg.className='mok';msg.textContent='Site ajoute !';msg.style.display='';setTimeout(function(){msg.style.display='none';},2000);}
