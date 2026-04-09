@@ -1127,25 +1127,6 @@ function runKiosk(payload,type,student){
   }
   updAC();
 
-  function loadResourceUrl(url, iframe){
-    if(!iframe)return;
-    var apiUrl=API_URL||SL('ek_api','');
-    if(!apiUrl){iframe.src=url;return;}
-    // Utiliser l'URL proxy directement comme src de l'iframe
-    // Apps Script sert le HTML avec Content-Type text/html — les ressources se chargent normalement
-    var proxyUrl=apiUrl+'?action=proxy&url='+encodeURIComponent(url)+'&t='+Date.now();
-    iframe.src=proxyUrl;
-    // Indicateur de chargement
-    var panel=document.getElementById('res-panel');
-    var old=document.getElementById('res-loader');if(old)old.remove();
-    var loader=document.createElement('div');
-    loader.id='res-loader';
-    loader.style.cssText='position:absolute;inset:0;background:#0f2044;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#fff;z-index:2;pointer-events:none;';
-    loader.innerHTML='<div style="width:36px;height:36px;border:3px solid rgba(255,255,255,.15);border-top-color:var(--gd);border-radius:50%;animation:spin 1s linear infinite"></div><div style="font-size:.82rem;opacity:.6">Chargement...</div>';
-    if(panel){panel.style.position='relative';panel.appendChild(loader);}
-    iframe.onload=function(){var ld=document.getElementById('res-loader');if(ld)ld.remove();};
-  }
-
   function showResources(){
     var resources=SL(K.res,[]);
     if(!resources.length)return;
@@ -1166,12 +1147,9 @@ function runKiosk(payload,type,student){
         +tabs
         +'<button id="res-close" style="margin-left:auto;padding:7px 12px;border:none;background:rgba(255,80,80,.2);color:#ffaaaa;cursor:pointer;font-size:.8rem;flex-shrink:0;font-weight:700">&#10005;</button>'
       +'</div>'
-      +'<iframe id="res-iframe" style="flex:1;border:none;width:100%;display:block;" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>';
+      +'<iframe id="res-iframe" src="'+resources[0].url+'" style="flex:1;border:none;width:100%;display:block;" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>';
     document.body.appendChild(panel);
     _resourcesOpen=true;
-
-    var iframe=document.getElementById('res-iframe');
-    loadResourceUrl(resources[0].url, iframe);
 
     document.getElementById('res-close').onclick=function(){
       _resourcesOpen=false;panel.remove();
@@ -1182,7 +1160,7 @@ function runKiosk(payload,type,student){
         panel.querySelectorAll('.res-tab').forEach(function(b){b.style.borderBottomColor='transparent';b.style.color='rgba(255,255,255,.6)';});
         btn.style.borderBottomColor='var(--gd)';btn.style.color='#fff';
         var iframe=document.getElementById('res-iframe');
-        loadResourceUrl(btn.dataset.url, iframe);
+        if(iframe)iframe.src=btn.dataset.url;
       };
     });
   }
