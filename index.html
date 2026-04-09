@@ -1131,38 +1131,19 @@ function runKiosk(payload,type,student){
     if(!iframe)return;
     var apiUrl=API_URL||SL('ek_api','');
     if(!apiUrl){iframe.src=url;return;}
-    // Spinner de chargement
+    // Utiliser l'URL proxy directement comme src de l'iframe
+    // Apps Script sert le HTML avec Content-Type text/html — les ressources se chargent normalement
+    var proxyUrl=apiUrl+'?action=proxy&url='+encodeURIComponent(url)+'&t='+Date.now();
+    iframe.src=proxyUrl;
+    // Indicateur de chargement
     var panel=document.getElementById('res-panel');
     var old=document.getElementById('res-loader');if(old)old.remove();
     var loader=document.createElement('div');
     loader.id='res-loader';
-    loader.style.cssText='position:absolute;inset:0;background:#0f2044;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#fff;z-index:2;';
-    loader.innerHTML='<div style="width:36px;height:36px;border:3px solid rgba(255,255,255,.15);border-top-color:var(--gd);border-radius:50%;animation:spin 1s linear infinite"></div><div style="font-size:.82rem;opacity:.6">Chargement via proxy...</div>';
+    loader.style.cssText='position:absolute;inset:0;background:#0f2044;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#fff;z-index:2;pointer-events:none;';
+    loader.innerHTML='<div style="width:36px;height:36px;border:3px solid rgba(255,255,255,.15);border-top-color:var(--gd);border-radius:50%;animation:spin 1s linear infinite"></div><div style="font-size:.82rem;opacity:.6">Chargement...</div>';
     if(panel){panel.style.position='relative';panel.appendChild(loader);}
-    var cbName='_ek_proxy_'+Date.now();
-    var s=document.createElement('script');
-    window[cbName]=function(data){
-      delete window[cbName];if(s&&s.parentNode)s.parentNode.removeChild(s);
-      var ld=document.getElementById('res-loader');if(ld)ld.remove();
-      if(data&&data.ok){
-        if(data.isPdf&&data.data){
-          try{
-            var arr=new Uint8Array(atob(data.data).split('').map(function(c){return c.charCodeAt(0);}));
-            var blob=new Blob([arr],{type:'application/pdf'});
-            iframe.src=URL.createObjectURL(blob);
-          }catch(e){iframe.src=url;}
-        }else if(data.html){
-          iframe.removeAttribute('src');
-          iframe.srcdoc=data.html;
-        }else{iframe.src=url;}
-      }else{iframe.src=url;}
-    };
-    s.onerror=function(){
-      var ld=document.getElementById('res-loader');if(ld)ld.remove();
-      iframe.src=url;
-    };
-    s.src=apiUrl+'?action=proxy&url='+encodeURIComponent(url)+'&callback='+cbName+'&t='+Date.now();
-    document.head.appendChild(s);
+    iframe.onload=function(){var ld=document.getElementById('res-loader');if(ld)ld.remove();};
   }
 
   function showResources(){
