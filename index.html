@@ -1132,13 +1132,13 @@ function runKiosk(payload,type,student){
     if(!resources.length)return;
     var existing=document.getElementById('res-panel');
     if(existing){_resourcesOpen=false;existing.remove();
-      var kb=document.getElementById('kbody');if(kb)kb.style.width='';
+      var kb=document.getElementById('kbody');if(kb)kb.style.marginRight='';
       return;
     }
     var panel=document.createElement('div');
     panel.id='res-panel';
     panel.style.cssText='position:fixed;top:0;right:0;width:42%;max-width:520px;min-width:300px;height:100%;background:#fff;z-index:9990;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.35);';
-    var kb=document.getElementById('kbody');if(kb)kb.style.cssText+='width:58%;min-width:0;';
+    var kb=document.getElementById('kbody');if(kb)kb.style.marginRight='42%';
     var tabs=resources.map(function(r,i){
       return '<button class="res-tab" data-url="'+r.url+'" style="padding:7px 14px;border:none;border-bottom:2px solid '+(i===0?'var(--gd)':'transparent')+';background:transparent;color:'+(i===0?'#fff':'rgba(255,255,255,.6)')+';cursor:pointer;font-size:.78rem;font-weight:600;white-space:nowrap;flex-shrink:0">'+r.name+'</button>';
     }).join('');
@@ -1153,7 +1153,7 @@ function runKiosk(payload,type,student){
 
     document.getElementById('res-close').onclick=function(){
       _resourcesOpen=false;panel.remove();
-      var kb2=document.getElementById('kbody');if(kb2)kb2.style.width='';
+      var kb2=document.getElementById('kbody');if(kb2)kb2.style.marginRight='';
     };
     panel.querySelectorAll('.res-tab').forEach(function(btn){
       btn.onclick=function(){
