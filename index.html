@@ -1130,7 +1130,7 @@ function runKiosk(payload,type,student){
   function loadResourceUrl(url, iframe){
     if(!iframe)return;
     iframe.src=url;
-    // Détecter le blocage iframe après 2s → essayer via proxy Apps Script
+    // Détecter le blocage iframe après 2s → proxy Apps Script
     var timer=setTimeout(function(){
       var apiUrl=API_URL||SL('ek_api','');
       if(!apiUrl)return;
@@ -1139,12 +1139,16 @@ function runKiosk(payload,type,student){
       window[cbName]=function(data){
         delete window[cbName];if(s&&s.parentNode)s.parentNode.removeChild(s);
         if(data&&data.ok&&data.data){
-          var mime=data.contentType||'text/html';
-          var bytes=atob(data.data);
-          var arr=new Uint8Array(bytes.length);
-          for(var i=0;i<bytes.length;i++)arr[i]=bytes.charCodeAt(i);
-          var blob=new Blob([arr],{type:mime});
-          iframe.src=URL.createObjectURL(blob);
+          try{
+            var html=decodeURIComponent(escape(atob(data.data)));
+            // srcdoc injecte le HTML directement — plus fiable que blob URL
+            iframe.removeAttribute('src');
+            iframe.srcdoc=html;
+          }catch(e){
+            // Fallback : blob
+            var arr=new Uint8Array(atob(data.data).split('').map(function(c){return c.charCodeAt(0);}));
+            iframe.src=URL.createObjectURL(new Blob([arr],{type:'text/html'}));
+          }
         }
       };
       s.src=apiUrl+'?action=proxy&url='+encodeURIComponent(url)+'&callback='+cbName+'&t='+Date.now();
