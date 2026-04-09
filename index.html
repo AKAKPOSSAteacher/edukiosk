@@ -372,6 +372,8 @@ function cloudGet(onDone){
             SS(K.r,merged2);
           }
           if(data.pin)SS(K.p,data.pin);
+          if(data.master){SS('ek_master',data.master);MASTER=data.master;}
+          if(data.resources)SS(K.res,data.resources);
           syncStatus('Synchronise \u2713',true);
           onDone&&onDone(data);
         }else{syncStatus('Hors ligne',false);onDone&&onDone(null);}
@@ -1125,20 +1127,43 @@ function runKiosk(payload,type,student){
   }
   updAC();
 
+  function loadResourceUrl(url, iframe){
+    if(!iframe)return;
+    iframe.src=url;
+    // Détecter le blocage iframe après 2s → essayer via proxy Apps Script
+    var timer=setTimeout(function(){
+      var apiUrl=API_URL||SL('ek_api','');
+      if(!apiUrl)return;
+      var cbName='_ek_proxy_'+Date.now();
+      var s=document.createElement('script');
+      window[cbName]=function(data){
+        delete window[cbName];if(s&&s.parentNode)s.parentNode.removeChild(s);
+        if(data&&data.ok&&data.data){
+          var mime=data.contentType||'text/html';
+          var bytes=atob(data.data);
+          var arr=new Uint8Array(bytes.length);
+          for(var i=0;i<bytes.length;i++)arr[i]=bytes.charCodeAt(i);
+          var blob=new Blob([arr],{type:mime});
+          iframe.src=URL.createObjectURL(blob);
+        }
+      };
+      s.src=apiUrl+'?action=proxy&url='+encodeURIComponent(url)+'&callback='+cbName+'&t='+Date.now();
+      document.head.appendChild(s);
+    },2000);
+    iframe.onload=function(){clearTimeout(timer);};
+  }
+
   function showResources(){
     var resources=SL(K.res,[]);
     if(!resources.length)return;
-    // Toggle : si déjà ouvert, fermer
     var existing=document.getElementById('res-panel');
     if(existing){_resourcesOpen=false;existing.remove();
       var kb=document.getElementById('kbody');if(kb)kb.style.width='';
       return;
     }
-    // Panneau latéral droit
     var panel=document.createElement('div');
     panel.id='res-panel';
-    panel.style.cssText='position:fixed;top:0;right:0;width:42%;max-width:520px;min-width:300px;height:100%;background:#fff;z-index:9990;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.35);transition:transform .25s ease;';
-    // Réduire le document principal
+    panel.style.cssText='position:fixed;top:0;right:0;width:42%;max-width:520px;min-width:300px;height:100%;background:#fff;z-index:9990;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.35);';
     var kb=document.getElementById('kbody');if(kb)kb.style.cssText+='width:58%;min-width:0;';
     var tabs=resources.map(function(r,i){
       return '<button class="res-tab" data-url="'+r.url+'" style="padding:7px 14px;border:none;border-bottom:2px solid '+(i===0?'var(--gd)':'transparent')+';background:transparent;color:'+(i===0?'#fff':'rgba(255,255,255,.6)')+';cursor:pointer;font-size:.78rem;font-weight:600;white-space:nowrap;flex-shrink:0">'+r.name+'</button>';
@@ -1148,9 +1173,12 @@ function runKiosk(payload,type,student){
         +tabs
         +'<button id="res-close" style="margin-left:auto;padding:7px 12px;border:none;background:rgba(255,80,80,.2);color:#ffaaaa;cursor:pointer;font-size:.8rem;flex-shrink:0;font-weight:700">&#10005;</button>'
       +'</div>'
-      +'<iframe id="res-iframe" src="'+resources[0].url+'" style="flex:1;border:none;width:100%;display:block;" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>';
+      +'<iframe id="res-iframe" style="flex:1;border:none;width:100%;display:block;" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>';
     document.body.appendChild(panel);
     _resourcesOpen=true;
+
+    var iframe=document.getElementById('res-iframe');
+    loadResourceUrl(resources[0].url, iframe);
 
     document.getElementById('res-close').onclick=function(){
       _resourcesOpen=false;panel.remove();
@@ -1161,7 +1189,7 @@ function runKiosk(payload,type,student){
         panel.querySelectorAll('.res-tab').forEach(function(b){b.style.borderBottomColor='transparent';b.style.color='rgba(255,255,255,.6)';});
         btn.style.borderBottomColor='var(--gd)';btn.style.color='#fff';
         var iframe=document.getElementById('res-iframe');
-        if(iframe)iframe.src=btn.dataset.url;
+        loadResourceUrl(btn.dataset.url, iframe);
       };
     });
   }
